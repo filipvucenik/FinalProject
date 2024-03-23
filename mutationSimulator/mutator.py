@@ -36,7 +36,7 @@ def main():
     rate_of_mutation = args.rate_of_mutation
     output_file = args.output_file
     if rate_of_mutation is None:
-        rate_of_mutation = 0.0001
+        rate_of_mutation = 0.01
     if output_file is None:
         ref_len_d = len(args.reference_genome_file.split("."))
         suff = args.reference_genome_file.split(".")[ref_len_d-1]
