@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.11)
 
 project(hifiasm
         VERSION 1.0
@@ -17,6 +17,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 include(FetchContent)
+include(GNUInstallDirs)
 
 ## Find bioparser package
 find_package(bioparser 3.0.13 QUIET)
@@ -89,6 +90,43 @@ if (NOT thread_pool_FOUND)
     endif ()
 endif ()
 
+### Adding ram
+find_package(ram 1.0.0 QUIET)
+if (NOT ram_FOUND)
+    FetchContent_Declare(
+            ram
+            GIT_REPOSITORY https://github.com/kocijan/ram
+            GIT_TAG kocijan/hpc)
+
+    FetchContent_GetProperties(ram)
+    if (NOT ram_POPULATED)
+        FetchContent_Populate(ram)
+        add_subdirectory(
+                ${ram_SOURCE_DIR}
+                ${ram_BINARY_DIR}
+                EXCLUDE_FROM_ALL)
+    endif ()
+endif ()
+
+# adding edlib
+find_package(edlib 1.2.7 QUIET)
+if (NOT edlib_FOUND)
+    FetchContent_Declare(
+            edlib
+            GIT_REPOSITORY https://github.com/martinsos/edlib
+            GIT_TAG v1.2.7)
+
+    FetchContent_GetProperties(edlib)
+    if (NOT edlib_POPULATED)
+        FetchContent_Populate(edlib)
+        add_subdirectory(
+                ${edlib_SOURCE_DIR}
+                ${edlib_BINARY_DIR}
+                EXCLUDE_FROM_ALL)
+    endif ()
+endif ()
+
+
 add_executable(hifiasm_exe
 src/hifiasm.cpp)
 
@@ -96,4 +134,6 @@ target_link_libraries(hifiasm_exe
         bioparser::bioparser
         biosoup::biosoup
         thread_pool::thread_pool
-)
+        ram::ram
+        edlib::edlib
+        )
