@@ -10,7 +10,9 @@ def read_reference_genome(file_path):
     with open(file_path, 'r') as file:
         for line in file:
             if line.startswith('>'):
-                name = line
+                parts = line.split(" ")
+                parts[0] = parts[0] + "_mutated"
+                name = " ".join(parts)
             else:
                 genome += line
 
@@ -39,8 +41,8 @@ def main():
         rate_of_mutation = 0.01
     if output_file is None:
         ref_len_d = len(args.reference_genome_file.split("."))
-        suff = args.reference_genome_file.split(".")[ref_len_d-1]
-        name = args.reference_genome_file.split(".")[ref_len_d-2]
+        suff = args.reference_genome_file.split(".")[ref_len_d - 1]
+        name = args.reference_genome_file.split(".")[ref_len_d - 2]
 
         output_file = name + "_mutated." + suff
     result = read_reference_genome(args.reference_genome_file)
