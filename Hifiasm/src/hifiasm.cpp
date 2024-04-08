@@ -287,7 +287,45 @@ int main (int argc, char* argv[]) {
                 }
             }
         }
+        /*
+        std::uint32_t cons =0;
+        for(auto &p: base_pile_tmp){
+            bool flag = false;
+            if(p.a > cons){
+                std::cout<<"a ="<<p.a<<std::endl;
+                flag = true;
+            }
+            if(p.c > cons){
+                std::cout<<"c ="<<p.c<<std::endl;
+                flag = true;
 
+            }
+            if(p.g > cons){
+                std::cout<<"g ="<<p.g<<std::endl;
+                flag = true;
+
+            }
+            if(p.t > cons){
+                std::cout<<"t ="<<p.t<<std::endl;
+                flag = true;
+
+            }
+            if(p.i > cons){
+                std::cout<<"i ="<<p.i<<std::endl;
+                flag = true;
+
+            }
+            if(p.d > cons){
+                std::cout<<"d ="<<p.d<<std::endl;
+                flag = true;
+
+            }
+
+            if(flag){
+                std::cout<<std::endl;
+            }
+        }
+        */
 
         for (const auto &jt: base_pile_tmp) {
             //cov.emplace_back(jt.a + jt.c + jt.g + jt.t);
@@ -309,6 +347,11 @@ int main (int argc, char* argv[]) {
             };
 
             double sum = std::accumulate(counts.begin(), counts.end(), 0);
+
+            /*
+            if(sum > 0)
+                std::cout<<"sum="<<sum<<std::endl;
+            */
 
             if (use_frequencies) {
                 for (auto &kt: counts) {
