@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
+#include <fstream>
 
 #include <filesystem>
 
@@ -498,6 +499,21 @@ int main (int argc, char* argv[]) {
     }
 
     std::cout<<annotations.size()<<std::endl;
+
+    std::ofstream outdata;
+    outdata.open("snp_annotations.anno");
+
+    for (std::uint32_t i = 0; i < annotations.size(); ++i) {
+        if (annotations[i].empty()) {
+            continue;
+        }
+        outdata << i;
+        for (const auto &jt: annotations[i]) {
+            outdata << " " << jt;
+        }
+        outdata << std::endl;
+    }
+
 
 
     return 0;
