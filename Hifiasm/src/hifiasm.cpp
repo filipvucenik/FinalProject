@@ -287,7 +287,7 @@ int main (int argc, char* argv[]) {
                 }
             }
         }
-        /*
+
         std::uint32_t cons =0;
         for(auto &p: base_pile_tmp){
             bool flag = false;
@@ -325,7 +325,7 @@ int main (int argc, char* argv[]) {
                 std::cout<<std::endl;
             }
         }
-        */
+
 
         for (const auto &jt: base_pile_tmp) {
             //cov.emplace_back(jt.a + jt.c + jt.g + jt.t);
@@ -348,10 +348,10 @@ int main (int argc, char* argv[]) {
 
             double sum = std::accumulate(counts.begin(), counts.end(), 0);
 
-            /*
+
             if(sum > 0)
                 std::cout<<"sum="<<sum<<std::endl;
-            */
+
 
             if (use_frequencies) {
                 for (auto &kt: counts) {
