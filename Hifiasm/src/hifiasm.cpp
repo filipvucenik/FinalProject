@@ -496,7 +496,7 @@ int main (int argc, char* argv[]) {
         j = i + 1;
     }
 
-
+    std::cout<<annotations.size()<<std::endl;
 
 
     return 0;
