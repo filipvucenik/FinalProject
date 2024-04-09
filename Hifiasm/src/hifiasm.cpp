@@ -77,7 +77,7 @@ int main (int argc, char* argv[]) {
     unsigned int gap = 10000;
     std::uint8_t ploidy = 2;
     double f = 0.001;
-    auto threads = std::make_shared<thread_pool::ThreadPool>(10);
+    auto threads = std::make_shared<thread_pool::ThreadPool>(64);
 
     //initializing ram minimizer_engine
     ram::MinimizerEngine minimizer_engine{
