@@ -91,7 +91,6 @@ int main (int argc, char* argv[]) {
     };
 
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
-    std::vector<std::unordered_set<std::uint32_t>> annotations;
 
     while (true){
         std::vector<std::unique_ptr<biosoup::NucleicAcid>> buffer;
@@ -112,6 +111,8 @@ int main (int argc, char* argv[]) {
     }
 
     std::vector<std::vector<biosoup::Overlap>> overlaps(sequences.size());
+    std::vector<std::unordered_set<std::uint32_t>> annotations(sequences.size());
+
 
     auto overlap_length = [](const biosoup::Overlap &o) -> std::uint32_t {
         return std::max(o.rhs_end - o.rhs_begin, o.lhs_end - o.lhs_begin);
