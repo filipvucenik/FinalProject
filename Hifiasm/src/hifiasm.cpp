@@ -289,7 +289,7 @@ int main (int argc, char* argv[]) {
                 }
             }
         }
-
+/*
         std::uint32_t cons =0;
         for(auto &p: base_pile_tmp){
             bool flag = false;
@@ -327,6 +327,7 @@ int main (int argc, char* argv[]) {
                 std::cout<<std::endl;
             }
         }
+*/
 
 
         for (const auto &jt: base_pile_tmp) {
@@ -350,10 +351,10 @@ int main (int argc, char* argv[]) {
 
             double sum = std::accumulate(counts.begin(), counts.end(), 0);
 
-
+/*
             if(sum > 0)
                 std::cout<<"sum="<<sum<<std::endl;
-
+*/
 
             if (use_frequencies) {
                 for (auto &kt: counts) {
@@ -490,12 +491,13 @@ int main (int argc, char* argv[]) {
                 it.wait();
             }
         }
-
-        if(ploidy >= 2){
-            call_snps(i, overlaps[i]);
-        }
-
         j = i + 1;
+    }
+
+    if(ploidy >= 2){
+        for(size_t l = 0; l < sequences.size(); l++){
+            call_snps(l, overlaps[l]);
+        }
     }
 
     std::cout<<annotations.size()<<std::endl;
