@@ -60,7 +60,7 @@ def main():
     reads = read_reads(reads_file)
 
     reads_split = reads_file.split(".")
-    output_file = ".".join(reads_split[:-1]) + ".out"
+    output_file = ".".join(reads_split[:-1])+"_anno" + ".out"
 
     output = []
 
@@ -74,11 +74,10 @@ def main():
 
         lower_bound_ind = equal_or_higher(mutations, lower_bound)
         upper_bound_ind = equal_or_lower(mutations, upper_bound)
-        output.append(read)
         positions = []
         for j in range(lower_bound_ind, upper_bound_ind + 1):
             positions.append(str(mutations[j] - lower_bound))
-        output.append("Positions=" + ",".join(positions))
+        output.append(str(int(read.split(",")[0].split("=")[1]) - 1) + " " + " ".join(positions))
 
     with open(output_file, 'w') as file:
         for line in output:
