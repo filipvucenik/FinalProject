@@ -70,8 +70,8 @@ int main (int argc, char* argv[]) {
     auto parser = create_parser(reads_file);
 
     //parameters for ram
-    unsigned int kmer = 15;
-    unsigned int w = 5;
+    unsigned int kmer = 15; // 30
+    unsigned int w = 5; // 15
     unsigned int b = 500;
     unsigned int chain = 4;
     unsigned int matches = 100;
@@ -477,9 +477,19 @@ int main (int argc, char* argv[]) {
             bytes = 0;
 
             for (auto &it: thread_futures) {
+                std::vector<biosoup::Overlap> overlaps_tmp;
                 for (const auto &jt: it.get()) {
-                    overlaps[jt.lhs_id].emplace_back(jt);
-                    overlaps[jt.rhs_id].emplace_back(cigar_overlap_reverse(jt));
+                    overlaps_tmp.emplace_back(jt);
+                    //overlaps[jt.lhs_id].emplace_back(jt);
+                    //overlaps[jt.rhs_id].emplace_back(cigar_overlap_reverse(jt));
+
+                }
+                std::sort(overlaps_tmp.begin(), overlaps_tmp.end(), [](auto  o1, auto o2) {
+                    return o1.score > o2.score;
+                });
+                for(size_t v = 0; v < std::min(30UL,overlaps_tmp.size()); v++){
+                    overlaps[overlaps_tmp[v].lhs_id].emplace_back(overlaps_tmp[v]);
+                    overlaps[overlaps_tmp[v].rhs_id].emplace_back(cigar_overlap_reverse(overlaps_tmp[v]));
 
                 }
             }
