@@ -125,14 +125,47 @@ if (NOT edlib_FOUND)
     endif ()
 endif ()
 
+set_target_properties(ram PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_executable(hifiasm_exe
-src/hifiasm.cpp)
+add_executable(snp
+        src/snp_main.cpp)
 
-target_link_libraries(hifiasm_exe
+add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
+add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
+
+
+target_include_directories(ram_overlap_source PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS}
+        ${thread_pool_INCLUDE_DIRS}
+        ${ram_INCLUDE_DIRS}
+        ${edlib_INCLUDE_DIRS}
+        )
+
+target_link_libraries(ram_overlap_source
         bioparser::bioparser
         biosoup::biosoup
         thread_pool::thread_pool
         ram::ram
         edlib::edlib
+        )
+
+target_include_directories(snp PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS}
+        ${thread_pool_INCLUDE_DIRS}
+        ${ram_INCLUDE_DIRS}
+        ${edlib_INCLUDE_DIRS}
+)
+
+target_link_libraries(snp
+        bioparser::bioparser
+        biosoup::biosoup
+        thread_pool::thread_pool
+        ram::ram
+        edlib::edlib
+        overlap_source_factory
+        ram_overlap_source
         )

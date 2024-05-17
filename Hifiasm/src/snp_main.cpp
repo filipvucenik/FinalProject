@@ -8,13 +8,10 @@
 
 #include <filesystem>
 
-#include "hifiasm.hpp"
-#include "bioparser/fasta_parser.hpp"
 #include "biosoup/nucleic_acid.hpp"
 #include "biosoup/overlap.hpp"
-#include "thread_pool/thread_pool.hpp"
 #include "edlib.h"
-#include "ram/minimizer_engine.hpp"
+#include "overlap_sources/overlap_source_factory.hpp"
 
 
 
@@ -25,27 +22,9 @@ double freq_high_th = 0.667;
 std::uint8_t print_snp_data = 1;
 
 
-std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
+std::string usage = "Usage: snp <overlap_source> <overlap_source_args>\n";
 
-std::string usage = "Usage: hifiasm <path_to_reads>\n";
 
-std::unique_ptr<bioparser::Parser<biosoup::NucleicAcid>> create_parser(std::string& path){
-    auto is_suffix = [] (const std::string& s, const std::string& suff) {
-        return s.size() >= suff.size() && s.compare(s.size() - suff.size(), suff.size(), suff) == 0;
-    };
-
-    if (is_suffix(path, ".fasta") || is_suffix(path, ".fasta.gz") ||
-        is_suffix(path, ".fna")   || is_suffix(path, ".fna.gz")   ||
-        is_suffix(path, ".fa")    || is_suffix(path, ".fa.gz"))  {
-        try {
-            return bioparser::Parser<biosoup::NucleicAcid>::Create<bioparser::FastaParser>(path);
-
-        } catch (const std::invalid_argument& exception) {
-            std::cerr << exception.what() << std::endl;
-        }
-    }
-    return nullptr;
-}
 
 struct base_pile {
     std::uint32_t a;
@@ -67,53 +46,10 @@ int main (int argc, char* argv[]) {
     }
     std::string reads_file = argv[1];
 
-    auto parser = create_parser(reads_file);
-
-    //parameters for ram
-    unsigned int kmer = 15; // 30
-    unsigned int w = 5; // 15
-    unsigned int b = 500;
-    unsigned int chain = 4;
-    unsigned int matches = 100;
-    unsigned int gap = 10000;
-    std::uint8_t ploidy = 2;
-    double f = 0.001;
-    auto threads = std::make_shared<thread_pool::ThreadPool>(64);
-
-    //initializing ram minimizer_engine
-    ram::MinimizerEngine minimizer_engine{
-            threads,
-            kmer,
-            w,
-            b,
-            chain,
-            matches,
-            gap
-    };
-
-    std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
-
-    while (true){
-        std::vector<std::unique_ptr<biosoup::NucleicAcid>> buffer;
-        try{
-            buffer = parser->Parse(1U <<30);
-        }catch (std::invalid_argument& exception) {
-            std::cerr << exception.what() << std::endl;
-            return 1;
-        }
-
-        if(buffer.empty()){
-            break;
-        }
-        sequences.reserve(sequences.size() + buffer.size());
-        for(auto& sequence: buffer){
-            sequences.push_back(std::move(sequence));
-        }
-    }
-
-    std::vector<std::vector<biosoup::Overlap>> overlaps(sequences.size());
-    std::vector<std::unordered_set<std::uint32_t>> annotations(sequences.size());
-
+    OverlapSource* os = create_overlap_source("ram", reads_file);
+    std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences = os->get_sequences();
+    std::vector<std::vector<biosoup::Overlap>>* overlaps = os->get_overlaps();
+    std::vector<std::unordered_set<std::uint32_t>> annotations((*sequences).size());
 
     auto overlap_length = [](const biosoup::Overlap &o) -> std::uint32_t {
         return std::max(o.rhs_end - o.rhs_begin, o.lhs_end - o.lhs_begin);
@@ -231,7 +167,7 @@ int main (int argc, char* argv[]) {
 
 
     auto call_snps = [&](std::uint32_t i, std::vector<biosoup::Overlap> ovlps_final) -> void {
-        std::uint32_t seq_inflated_len = sequences[i]->inflated_len;
+        std::uint32_t seq_inflated_len = (*sequences)[i]->inflated_len;
         std::vector<base_pile> base_pile_tmp(seq_inflated_len);
         std::vector<std::uint32_t> cov;
 
@@ -240,7 +176,7 @@ int main (int argc, char* argv[]) {
                 std::uint32_t lhs_pos = ovlp.lhs_begin;
                 std::uint32_t rhs_pos = 0;
                 biosoup::NucleicAcid rhs{"",
-                                         sequences[ovlp.rhs_id]->InflateData(ovlp.rhs_begin,
+                                         (*sequences)[ovlp.rhs_id]->InflateData(ovlp.rhs_begin,
                                                                              ovlp.rhs_end - ovlp.rhs_begin)};
                 if (!ovlp.strand) rhs.ReverseAndComplement();
                 std::string rhs_tmp = rhs.InflateData();
@@ -289,46 +225,6 @@ int main (int argc, char* argv[]) {
                 }
             }
         }
-/*
-        std::uint32_t cons =0;
-        for(auto &p: base_pile_tmp){
-            bool flag = false;
-            if(p.a > cons){
-                std::cout<<"a ="<<p.a<<std::endl;
-                flag = true;
-            }
-            if(p.c > cons){
-                std::cout<<"c ="<<p.c<<std::endl;
-                flag = true;
-
-            }
-            if(p.g > cons){
-                std::cout<<"g ="<<p.g<<std::endl;
-                flag = true;
-
-            }
-            if(p.t > cons){
-                std::cout<<"t ="<<p.t<<std::endl;
-                flag = true;
-
-            }
-            if(p.i > cons){
-                std::cout<<"i ="<<p.i<<std::endl;
-                flag = true;
-
-            }
-            if(p.d > cons){
-                std::cout<<"d ="<<p.d<<std::endl;
-                flag = true;
-
-            }
-
-            if(flag){
-                std::cout<<std::endl;
-            }
-        }
-*/
-
 
         for (const auto &jt: base_pile_tmp) {
             //cov.emplace_back(jt.a + jt.c + jt.g + jt.t);
@@ -383,26 +279,6 @@ int main (int argc, char* argv[]) {
     };
 
 
-    std::size_t bytes = 0;
-    for(std::uint32_t  i = 0, j=0; i < sequences.size(); i++){
-        bytes += sequences[i]->inflated_len;
-        if (i != sequences.size() - 1 && bytes < (1ULL << 32)) {
-            continue;
-        }
-        bytes = 0;
-        minimizer_engine.Minimize(
-                sequences.begin() + j,
-                sequences.begin() + i + 1,
-                true);
-        minimizer_engine.Filter(f);
-
-        std::vector<std::uint32_t> num_overlaps(overlaps.size());
-        for (std::uint32_t k = 0; k < overlaps.size(); ++k) {
-            num_overlaps[k] = overlaps[k].size();
-        }
-
-        std::vector<std::future<std::vector<biosoup::Overlap>>> thread_futures;
-
         auto edlib_wrapper = [&](
                 std::uint32_t i,
                 const biosoup::Overlap &it,
@@ -424,91 +300,12 @@ int main (int argc, char* argv[]) {
             }
         };
 
-        for (std::uint32_t k = 0; k < i + 1; ++k) {
-            thread_futures.emplace_back(threads->Submit(
-                    [&](std::uint32_t i) -> std::vector<biosoup::Overlap> { // map sequences and fill out the potential snp list
-                        std::vector<biosoup::Overlap> ovlps = minimizer_engine.Map(sequences[i], true, true,
-                                                                                   true, false);
-                        if (!ovlps.empty()) {
-                            std::vector<biosoup::Overlap> ovlps_final;
 
-                            std::sort(ovlps.begin(), ovlps.end(),
-                                      [&](const biosoup::Overlap &lhs,
-                                          const biosoup::Overlap &rhs) -> bool {
-                                          return overlap_length(lhs) > overlap_length(rhs);
-                                      });
 
-                            std::vector<biosoup::Overlap> tmp;
-                            tmp.insert(tmp.end(), ovlps.begin(),
-                                       ovlps.begin() + (ovlps.size() > 24 ? 24 : ovlps.size()));  // NOLINT
-                            tmp.swap(ovlps);
-
-                            for (const auto &ovlp: ovlps) {
-                                auto lhs = sequences[i]->InflateData(ovlp.lhs_begin,
-                                                                     ovlp.lhs_end - ovlp.lhs_begin);
-                                biosoup::NucleicAcid rhs_{"",
-                                                          sequences[ovlp.rhs_id]->InflateData(ovlp.rhs_begin,
-                                                                                              ovlp.rhs_end -
-                                                                                              ovlp.rhs_begin)};
-
-                                if (!ovlp.strand) rhs_.ReverseAndComplement();
-
-                                auto rhs = rhs_.InflateData();
-
-                                std::string tmp = edlib_wrapper(i, ovlp, lhs, rhs);
-
-                                biosoup::Overlap ovlp_tmp{ovlp.lhs_id, ovlp.lhs_begin, ovlp.lhs_end,
-                                                          ovlp.rhs_id, ovlp.rhs_begin,
-                                                          ovlp.rhs_end, ovlp.score, tmp, ovlp.strand};
-                                ovlps_final.emplace_back(ovlp_tmp);
-
-                            };
-
-                            return ovlps_final;
-                        }
-                        return ovlps;
-                    },
-                    k));
-
-            bytes += sequences[k]->inflated_len;
-            if (k != i && bytes < (1U << 30)) {
-                continue;
-            }
-            bytes = 0;
-
-            for (auto &it: thread_futures) {
-                std::vector<biosoup::Overlap> overlaps_tmp;
-                for (const auto &jt: it.get()) {
-                    overlaps_tmp.emplace_back(jt);
-                    //overlaps[jt.lhs_id].emplace_back(jt);
-                    //overlaps[jt.rhs_id].emplace_back(cigar_overlap_reverse(jt));
-
-                }
-                std::sort(overlaps_tmp.begin(), overlaps_tmp.end(), [](auto  o1, auto o2) {
-                    return o1.score > o2.score;
-                });
-                for(size_t v = 0; v < std::min(30UL,overlaps_tmp.size()); v++){
-                    overlaps[overlaps_tmp[v].lhs_id].emplace_back(overlaps_tmp[v]);
-                    overlaps[overlaps_tmp[v].rhs_id].emplace_back(cigar_overlap_reverse(overlaps_tmp[v]));
-
-                }
-            }
-            thread_futures.clear();
-
-            std::vector<std::future<void>> void_futures;
-
-            for (const auto &it: void_futures) {
-                it.wait();
-            }
-        }
-        j = i + 1;
+    for(size_t l = 0; l < (*sequences).size(); l++){
+        call_snps(l, (*overlaps)[l]);
     }
 
-    if(ploidy >= 2){
-        for(size_t l = 0; l < sequences.size(); l++){
-            call_snps(l, overlaps[l]);
-        }
-    }
 
     std::cout<<annotations.size()<<std::endl;
 
