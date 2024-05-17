@@ -35,68 +35,50 @@ struct base_pile {
     std::uint32_t d;
 };
 
+void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences, std::string& out_file){
+    std::ofstream os(out_file);
+    for (const auto &it: *overlaps) {
+        for (const auto &jt: it) {
+            os << (*sequences)[jt.lhs_id]->name
+               << "\t" << (*sequences)[jt.lhs_id]->inflated_len  // length
+               << "\t" << jt.lhs_begin
+               << "\t" << jt.lhs_end
+               << "\t" << (jt.strand ? "+" : "-")
+               << "\t" << (*sequences)[jt.rhs_id]->name
+               << "\t" << (*sequences)[jt.rhs_id]->inflated_len  // length
+               << "\t" << jt.rhs_begin
+               << "\t" << jt.rhs_end
+               << "\t" << 255 // residue matches
+               << "\t" << 255 // alignment block length
+               << "\t" << 255
+               << std::endl;
+        }
+    }
+}
 
 
 
 int main (int argc, char* argv[]) {
     std::filesystem::path currentDir = std::filesystem::current_path();
-    if (argc != 2) {
+    if (argc < 3) {
         std::cout << usage;
         exit(1);
     }
-    std::string reads_file = argv[1];
+    std::string  lib = argv[1];
+    std::string arg = argv[2];
+    if(argc > 3){
+        for(int i = 3 ; i < argc; i++){
+            lib += " ";
+            lib += argv[i];
+        }
+    }
 
-    OverlapSource* os = create_overlap_source("ram", reads_file);
+    OverlapSource* os = create_overlap_source("ram", arg);
     std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences = os->get_sequences();
+    std::cout<<"sequences loaded sequences"<<(*sequences).size()<<std::endl;
     std::vector<std::vector<biosoup::Overlap>>* overlaps = os->get_overlaps();
     std::vector<std::unordered_set<std::uint32_t>> annotations((*sequences).size());
-
-    auto overlap_length = [](const biosoup::Overlap &o) -> std::uint32_t {
-        return std::max(o.rhs_end - o.rhs_begin, o.lhs_end - o.lhs_begin);
-    };
-
-    auto edlib_alignment_reverse = [](const std::string &s) -> std::string {
-        std::string rs;
-        if (s.empty()) {
-            return rs;
-        }
-        for (char c: s) {
-            switch (c) {
-                case '2':
-                    rs += '\001';
-                    break;
-                case '1':
-                    rs += '\002';
-                    break;
-                default:
-                    rs += c;
-                    break;
-            }
-        }
-        return rs;
-    };
-
-    auto cigar_alignment_reverse = [](const std::string &s) -> std::string {
-        std::string rs;
-        if (s.empty()) {
-            return rs;
-        }
-        for (char c: s) {
-            switch (c) {
-                case 'I':
-                    rs += 'D';
-                    break;
-                case 'D':
-                    rs += 'I';
-                    break;
-                default:
-                    rs += c;
-                    break;
-            }
-        }
-        return rs;
-    };
-
+    std::cout<<"setup finished overlaps"<<(*overlaps).size()<<std::endl;
 
     auto cigar_to_edlib_alignment = [](const std::string &s) -> std::string {
         std::string rs = "";
@@ -148,23 +130,6 @@ int main (int argc, char* argv[]) {
         }
         return rs;
     };
-
-    auto overlap_reverse = [&edlib_alignment_reverse](const biosoup::Overlap &o) -> biosoup::Overlap {
-        return biosoup::Overlap(
-                o.rhs_id, o.rhs_begin, o.rhs_end,
-                o.lhs_id, o.lhs_begin, o.lhs_end,
-                o.score, edlib_alignment_reverse(o.alignment),
-                o.strand);
-    };
-
-    auto cigar_overlap_reverse = [&cigar_alignment_reverse](const biosoup::Overlap &o) -> biosoup::Overlap {
-        return biosoup::Overlap(
-                o.rhs_id, o.rhs_begin, o.rhs_end,
-                o.lhs_id, o.lhs_begin, o.lhs_end,
-                o.score, cigar_alignment_reverse(o.alignment),
-                o.strand);
-    };
-
 
     auto call_snps = [&](std::uint32_t i, std::vector<biosoup::Overlap> ovlps_final) -> void {
         std::uint32_t seq_inflated_len = (*sequences)[i]->inflated_len;
@@ -279,29 +244,6 @@ int main (int argc, char* argv[]) {
     };
 
 
-        auto edlib_wrapper = [&](
-                std::uint32_t i,
-                const biosoup::Overlap &it,
-                const std::string &lhs,
-                const std::string &rhs) -> std::string {
-            std::string cigar_alignment = "";
-            EdlibAlignResult result = edlibAlign(
-                    lhs.c_str(), lhs.size(),
-                    rhs.c_str(), rhs.size(),
-                    edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
-            if (result.status == EDLIB_STATUS_OK) {
-                cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
-                edlibFreeAlignResult(result);
-                return cigar_alignment;
-            } else {
-                edlibFreeAlignResult(result);
-                std::string cigar_alignment = "";
-                return cigar_alignment;
-            }
-        };
-
-
-
     for(size_t l = 0; l < (*sequences).size(); l++){
         call_snps(l, (*overlaps)[l]);
     }
@@ -322,9 +264,8 @@ int main (int argc, char* argv[]) {
         }
         outdata << std::endl;
     }
-
-
-
+    std::string out_file = "overlaps.paf";
+    printPaf(overlaps, sequences, out_file);
     return 0;
 
 }

@@ -132,7 +132,7 @@ add_executable(snp
 
 add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
 add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
-
+add_library(paf_overlap_source SHARED src/overlap_sources/paf_overlap_source.cpp)
 
 target_include_directories(ram_overlap_source PUBLIC
         ${PROJECT_SOURCE_DIR}/include
@@ -151,6 +151,17 @@ target_link_libraries(ram_overlap_source
         edlib::edlib
         )
 
+target_include_directories(paf_overlap_source PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS}
+        )
+
+target_link_libraries(paf_overlap_source
+        bioparser::bioparser
+        biosoup::biosoup
+)
+
 target_include_directories(snp PUBLIC
         ${PROJECT_SOURCE_DIR}/include
         ${bioparser_INCLUDE_DIRS}
@@ -168,4 +179,5 @@ target_link_libraries(snp
         edlib::edlib
         overlap_source_factory
         ram_overlap_source
+        ${CMAKE_DL_LIBS}
         )

@@ -236,7 +236,7 @@ private:
     }
 
 public:
-    RamOverlapSource(const std::string& reads){
+    explicit RamOverlapSource(const std::string& reads){
         this->reads = reads;
         load_sequences();
         this->overlaps.resize(sequences.size());
