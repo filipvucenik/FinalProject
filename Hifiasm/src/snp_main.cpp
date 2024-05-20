@@ -68,12 +68,12 @@ int main (int argc, char* argv[]) {
     std::string arg = argv[2];
     if(argc > 3){
         for(int i = 3 ; i < argc; i++){
-            lib += " ";
-            lib += argv[i];
+            arg += " ";
+            arg += argv[i];
         }
     }
 
-    OverlapSource* os = create_overlap_source("ram", arg);
+    OverlapSource* os = create_overlap_source(lib, arg);
     std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences = os->get_sequences();
     std::cout<<"sequences loaded sequences"<<(*sequences).size()<<std::endl;
     std::vector<std::vector<biosoup::Overlap>>* overlaps = os->get_overlaps();
