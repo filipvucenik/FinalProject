@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <string>
 #include <iostream>
+#include <filesystem>
 
 
 OverlapSource * create_overlap_source(const std::string &library, const std::string &args) {

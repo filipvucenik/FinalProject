@@ -1,8 +1,10 @@
 #include "overlap_source.hpp"
 #include "bioparser/fasta_parser.hpp"
-#include "bioparser/paf_parser.hpp"
 #include "biosoup/nucleic_acid.hpp"
 #include "biosoup/overlap.hpp"
+#include "thread_pool/thread_pool.hpp"
+#include "edlib.h"
+
 
 #include <iostream>
 #include <string>
@@ -19,26 +21,6 @@ private:
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
     std::string reads;
     std::string paf_file;
-    void load_sequences(){
-        auto parser = create_parser(reads);
-        while (true){
-            std::vector<std::unique_ptr<biosoup::NucleicAcid>> buffer;
-            try{
-                buffer = parser->Parse(1U <<30);
-            }catch (std::invalid_argument& exception) {
-                std::cerr << exception.what() << std::endl;
-                exit(1);
-            }
-
-            if(buffer.empty()){
-                break;
-            }
-            sequences.reserve(sequences.size() + buffer.size());
-            for(const auto& sequence: buffer){
-                sequences.push_back(std::make_unique<biosoup::NucleicAcid>(*sequence));
-            }
-        }
-    }
 
     std::unique_ptr<bioparser::Parser<biosoup::NucleicAcid>> create_parser(std::string& path){
         auto is_suffix = [] (const std::string& s, const std::string& suff) {
@@ -58,6 +40,28 @@ private:
         return nullptr;
     }
 
+    void load_sequences(){
+        auto parser = create_parser(reads);
+        while (true){
+            std::vector<std::unique_ptr<biosoup::NucleicAcid>> buffer;
+            try{
+                buffer = parser->Parse(1U <<30);
+            }catch (std::invalid_argument& exception) {
+                std::cerr << exception.what() << std::endl;
+                exit(1);
+            }
+
+            if(buffer.empty()){
+                break;
+            }
+            sequences.reserve(sequences.size() + buffer.size());
+            for(const auto& sequence: buffer){
+                sequences.push_back(std::make_unique<biosoup::NucleicAcid>(*sequence));
+            }
+        }
+
+    }
+
     size_t find_id(std::string overlap_name){
         for(auto& it : sequences){
             if(overlap_name == it->name){
@@ -70,6 +74,8 @@ private:
     void load_paf(){
         std::string line;
         std::ifstream fileStream(paf_file);
+        std::cout<<"Loading paf file"<<std::endl;
+        std::string tmp;
         while(std::getline(fileStream, line)){
             std::istringstream iss(line);
             std::string v;
@@ -80,11 +86,13 @@ private:
             size_t id_l = find_id(variables[0]);
             if(id_l == -1UL){
                 std::cerr<<"sequence missing"<<std::endl;
+                continue;
             }
 
             size_t id_r = find_id(variables[5]);
             if(id_r == -1UL){
                 std::cerr<<"sequence missing"<<std::endl;
+                continue;
             }
 
             overlaps[id_l].emplace_back(id_l,
@@ -94,22 +102,72 @@ private:
                                         std::stoi(variables[7]),
                                         std::stoi(variables[8]),
                                         255,
+                                        tmp,
                                         variables[4] == "+");
         }
+
+        std::cout<<"Loaded paf file"<<std::endl;
+        auto edlib_wrapper = [&](
+                std::uint32_t i,
+                const biosoup::Overlap &it,
+                const std::string &lhs,
+                const std::string &rhs) -> std::string {
+            std::string cigar_alignment = "";
+            EdlibAlignResult result = edlibAlign(
+                    lhs.c_str(), lhs.size(),
+                    rhs.c_str(), rhs.size(),
+                    edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
+            if (result.status == EDLIB_STATUS_OK) {
+                cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
+                edlibFreeAlignResult(result);
+                return cigar_alignment;
+            } else {
+                edlibFreeAlignResult(result);
+                std::string cigar_alignment = "";
+                return cigar_alignment;
+            }
+        };
+        auto threads = std::make_shared<thread_pool::ThreadPool>(64);
+        std::vector<std::future<void>> futures;
+        for(size_t i = 0; i < overlaps.size(); i++){
+                futures.emplace_back(threads->Submit([&](size_t i)->void{
+                    for(size_t j = 0; j < overlaps[i].size(); j++){
+                        auto lhs = sequences[i]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin);
+                        biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin));
+                        if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
+                        auto rhs = rhs_.InflateData();
+                        overlaps[i][j].alignment = edlib_wrapper(i, overlaps[i][j], lhs, rhs);
+                    }
+                }, i));
+        }
+
+        for(auto& future: futures){
+            future.wait();
+        }
+        std::cout<<"pairwise alignment done"<<std::endl;
+
     }
 
 public:
 
     std::vector<std::vector<biosoup::Overlap>>* get_overlaps() override {
-        if(overlaps.empty()) load_paf();
+        if(overlaps.empty()) {
+            this->overlaps = std::vector<std::vector<biosoup::Overlap>>(sequences.size());
+            load_paf();
+        }
+
         return &overlaps;
     }
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> * get_sequences() override{
         return &sequences;
     }
 
-    explicit PafOverlapSource(std::string& args){
+    explicit PafOverlapSource(std::string& args)
+    {
+        std::cout<<"args: "<<args<<std::endl;
         auto spacePos = std::find(args.begin(), args.end(), ' ');
+        std::cout<<"reads: "<<args.substr(0, std::distance(args.begin(), spacePos))<<std::endl;
+        std::cout<<"paf_file: "<<args.substr(std::distance(args.begin(), spacePos)+1)<<std::endl;
         this->reads = args.substr(0, std::distance(args.begin(), spacePos));
         this->paf_file = args.substr(std::distance(args.begin(), spacePos)+1);
         load_sequences();

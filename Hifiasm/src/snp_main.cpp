@@ -10,8 +10,8 @@
 
 #include "biosoup/nucleic_acid.hpp"
 #include "biosoup/overlap.hpp"
-#include "edlib.h"
 #include "overlap_sources/overlap_source_factory.hpp"
+#include "thread_pool/thread_pool.hpp"
 
 
 
@@ -35,6 +35,13 @@ struct base_pile {
     std::uint32_t d;
 };
 
+
+struct snp_position {
+    size_t sequence_ind;
+    size_t position;
+    base_pile pile;
+};
+
 void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences, std::string& out_file){
     std::ofstream os(out_file);
     for (const auto &it: *overlaps) {
@@ -50,7 +57,7 @@ void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<
                << "\t" << jt.rhs_end
                << "\t" << 255 // residue matches
                << "\t" << 255 // alignment block length
-               << "\t" << 255
+               << "\t" << jt.alignment
                << std::endl;
         }
     }
@@ -78,7 +85,9 @@ int main (int argc, char* argv[]) {
     std::cout<<"sequences loaded sequences"<<(*sequences).size()<<std::endl;
     std::vector<std::vector<biosoup::Overlap>>* overlaps = os->get_overlaps();
     std::vector<std::unordered_set<std::uint32_t>> annotations((*sequences).size());
+    std::vector<std::vector<snp_position>> snp_positions(50);
     std::cout<<"setup finished overlaps"<<(*overlaps).size()<<std::endl;
+
 
     auto cigar_to_edlib_alignment = [](const std::string &s) -> std::string {
         std::string rs = "";
@@ -130,8 +139,7 @@ int main (int argc, char* argv[]) {
         }
         return rs;
     };
-
-    auto call_snps = [&](std::uint32_t i, std::vector<biosoup::Overlap> ovlps_final) -> void {
+    auto call_snps = [&](std::uint32_t i, std::vector<biosoup::Overlap>& ovlps_final) -> void {
         std::uint32_t seq_inflated_len = (*sequences)[i]->inflated_len;
         std::vector<base_pile> base_pile_tmp(seq_inflated_len);
         std::vector<std::uint32_t> cov;
@@ -191,11 +199,11 @@ int main (int argc, char* argv[]) {
             }
         }
 
+        cov.reserve(base_pile_tmp.size());
         for (const auto &jt: base_pile_tmp) {
             //cov.emplace_back(jt.a + jt.c + jt.g + jt.t);
             cov.emplace_back(jt.a + jt.c + jt.g + jt.t + jt.d + jt.i);
         }
-
         std::nth_element(cov.begin(), cov.begin() + cov.size() / 2, cov.end());
         double m = cov[cov.size() / 2] * 2. / 3.;
 
@@ -209,13 +217,12 @@ int main (int argc, char* argv[]) {
                     static_cast<double>(jt.d),
                     static_cast<double>(jt.i)
             };
+            if(i < 50){
+                snp_positions[i].push_back({i, j, jt});
+            }
+
 
             double sum = std::accumulate(counts.begin(), counts.end(), 0);
-
-/*
-            if(sum > 0)
-                std::cout<<"sum="<<sum<<std::endl;
-*/
 
             if (use_frequencies) {
                 for (auto &kt: counts) {
@@ -242,12 +249,23 @@ int main (int argc, char* argv[]) {
             ++j;
         };
     };
-
+    auto threads = std::make_shared<thread_pool::ThreadPool>(64);
+    std::vector<std::future<void>> futures;
 
     for(size_t l = 0; l < (*sequences).size(); l++){
-        call_snps(l, (*overlaps)[l]);
+        //call_snps(l, (*overlaps)[l]);
+        futures.emplace_back(threads->Submit(
+                [&](size_t l){
+                    call_snps(l, (*overlaps)[l]);
+                },l
+                ));
+
+
     }
 
+    for(auto &future: futures){
+        future.wait();
+    }
 
     std::cout<<annotations.size()<<std::endl;
 
@@ -264,8 +282,26 @@ int main (int argc, char* argv[]) {
         }
         outdata << std::endl;
     }
-    std::string out_file = "overlaps.paf";
+
+    std::string out_file = "overlaps_hifiasm.paf";
     printPaf(overlaps, sequences, out_file);
+
+
+    std::ofstream pile_file;
+    pile_file.open("pile.txt");
+
+    for(auto &it: snp_positions){
+        if(it.empty()){
+            continue;
+        }
+        size_t ind = it[0].sequence_ind;
+        std::string seq = (*sequences)[ind]->InflateData();
+        pile_file <<"sequence: "<< ind << std::endl;
+       // pile_file<<seq<<std::endl;
+        for(auto jt: it){
+            pile_file<<seq[jt.position]<<"|a:"<<jt.pile.a<<"c:"<<jt.pile.c<<"g:"<<jt.pile.g<<"t:"<<jt.pile.t<<"i:"<<jt.pile.i<<"d:"<<jt.pile.d<<std::endl;
+        }
+    }
     return 0;
 
 }
