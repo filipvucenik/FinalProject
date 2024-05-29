@@ -239,10 +239,13 @@ public:
     explicit RamOverlapSource(const std::string& reads){
         this->reads = reads;
         load_sequences();
-        this->overlaps.resize(sequences.size());
+
     }
     std::vector<std::vector<biosoup::Overlap>>* get_overlaps() override {
-        if(overlaps.empty()) generate();
+        if(overlaps.empty()) {
+            this->overlaps.resize(sequences.size());
+            generate();
+        }
         return &overlaps;
     }
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> * get_sequences() override{
