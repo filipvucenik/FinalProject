@@ -19,6 +19,7 @@ private:
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
     std::string reads;
     std::string paf_file;
+    std::unordered_map<std::string , size_t> sequence_id;
 
     std::unique_ptr<bioparser::Parser<biosoup::NucleicAcid>> create_parser(std::string& path){
         auto is_suffix = [] (const std::string& s, const std::string& suff) {
@@ -55,6 +56,7 @@ private:
             sequences.reserve(sequences.size() + buffer.size());
             for(const auto& sequence: buffer){
                 sequences.push_back(std::make_unique<biosoup::NucleicAcid>(*sequence));
+                sequence_id[sequence->name] = sequences.size()-1;
             }
         }
 
@@ -81,18 +83,14 @@ private:
             while(std::getline(iss, v, '\t')){
                 variables.push_back(v);
             }
-            size_t id_l = find_id(variables[0]);
-            if(id_l == -1UL){
-                std::cerr<<"sequence missing"<<std::endl;
-                continue;
-            }
+            size_t id_l = sequence_id[variables[0]];
+            size_t id_r = sequence_id[variables[5]];
 
-            size_t id_r = find_id(variables[5]);
-            if(id_r == -1UL){
-                std::cerr<<"sequence missing"<<std::endl;
-                continue;
+            if(variables.size() == 12){
+                tmp = variables[11];
+            }else{
+                tmp = "";
             }
-
             overlaps[id_l].emplace_back(id_l,
                                         std::stoi(variables[2]),
                                         std::stoi(variables[3]),
@@ -100,8 +98,9 @@ private:
                                         std::stoi(variables[7]),
                                         std::stoi(variables[8]),
                                         255,
-                                        variables[11],
+                                        tmp,
                                         variables[4] == "+");
+
         }
         std::cout<<"Loaded paf file"<<std::endl;
     }

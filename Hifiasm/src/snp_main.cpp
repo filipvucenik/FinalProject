@@ -12,6 +12,7 @@
 #include "biosoup/overlap.hpp"
 #include "overlap_sources/overlap_source_factory.hpp"
 #include "thread_pool/thread_pool.hpp"
+#include "edlib.h"
 
 
 
@@ -64,8 +65,42 @@ void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<
 }
 
 
-
 int main (int argc, char* argv[]) {
+
+    //edlib debugging
+    /*
+    std::string s1 = "TTTTGCGCAACAAAGTCGTTTTAGATAATGCGAAAAAACAGCCTTTCCGGTACTCTACGGCGGTTTTAT";
+    std::string s2 = "TCTTTAACAACAAAATAGATTAACCAACCTAATGAAAAACAAATGAATTTAGCCAATCATTAAGATAAATCAGCGATTTTGCGCAACAAAGTCGTTTTAGATAATGCG";
+    std::string s3 = "TTTTGCGCAACAAAGTCGTTTT";
+
+    EdlibAlignResult result = edlibAlign(
+            s1.c_str(), s1.size(),
+            s2.c_str(), s2.size(),
+            edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
+    std::string cigar_alignment = "";
+    if (result.status == EDLIB_STATUS_OK) {
+        cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
+        edlibFreeAlignResult(result);
+    } else {
+        edlibFreeAlignResult(result);
+        std::string cigar_alignment = "";
+    }
+
+    std::cout<<cigar_alignment<<std::endl;
+
+    EdlibAlignResult result1 = edlibAlign(
+            s1.c_str(), s1.size(),
+            s3.c_str(), s3.size(),
+            edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
+    if (result1.status == EDLIB_STATUS_OK) {
+        cigar_alignment = edlibAlignmentToCigar(result1.alignment, result1.alignmentLength, EDLIB_CIGAR_EXTENDED);
+        edlibFreeAlignResult(result1);
+    } else {
+        edlibFreeAlignResult(result1);
+        std::string cigar_alignment = "";
+    }
+    std::cout<<cigar_alignment<<std::endl;
+     */
     std::filesystem::path currentDir = std::filesystem::current_path();
     if (argc < 3) {
         std::cout << usage;
@@ -88,7 +123,6 @@ int main (int argc, char* argv[]) {
     std::vector<std::vector<snp_position>> snp_positions(50);
     std::cout<<"setup finished overlaps"<<(*overlaps).size()<<std::endl;
 
-
     auto cigar_to_edlib_alignment = [](const std::string &s) -> std::string {
         std::string rs = "";
         std::uint64_t pos = 0;
@@ -98,7 +132,7 @@ int main (int argc, char* argv[]) {
         if (s.empty()) {
             return rs;
         }
-        for (int i = 0; i < s.length(); i++) {
+        for (size_t i = 0; i < s.length(); i++) {
             if (std::isdigit(s[i])) {
                 if (pos == 0) {
                     start_pos = i;
@@ -106,31 +140,35 @@ int main (int argc, char* argv[]) {
                 ++pos;
             } else {
                 total_num = 0;
-                for (int j = start_pos; j < start_pos + pos; j++) {
+                for (size_t j = start_pos; j < start_pos + pos; j++) {
                     total_num += (s[j] - '0') * std::pow(10, (start_pos + pos) - j - 1);
                 }
                 pos = 0;
                 switch (s[i]) {
                     case '=':
-                        for (int j = 0; j < total_num; j++) {
+                        for (size_t j = 0; j < total_num; j++) {
                             rs += '\000';
                         };
                         break;
                     case 'X':
-                        for (int j = 0; j < total_num; j++) {
+                        for (size_t j = 0; j < total_num; j++) {
                             rs += '\003';
                         };
                         break;
                     case 'I':
-                        for (int j = 0; j < total_num; j++) {
+                        for (size_t j = 0; j < total_num; j++) {
                             rs += '\001';
                         };
                         break;
                     case 'D':
-                        for (int j = 0; j < total_num; j++) {
+                        for (size_t j = 0; j < total_num; j++) {
                             rs += '\002';
                         };
                         break;
+                    case 'M':
+                        for(size_t j = 0; j < total_num; j++){
+                            rs += '\000';
+                        }
                     default:
                         //rs += '\000';
                         break;
@@ -156,7 +194,13 @@ int main (int argc, char* argv[]) {
 
                 std::string edlib_alignment = cigar_to_edlib_alignment(ovlp.alignment);
 
+
+
                 for (auto &edlib_align: edlib_alignment) {
+                    if(lhs_pos == 1){
+                        bool  flag;
+                        flag = true;
+                    }
                     switch (edlib_align) {
                         case 0:
                         case 3: {
@@ -186,7 +230,7 @@ int main (int argc, char* argv[]) {
                             break; // insertion on the left hand side
                         }
                         case 2: {
-                            if (!(lhs_pos >= base_pile_tmp.size())) {
+                            if (lhs_pos < base_pile_tmp.size()) {
                                 ++base_pile_tmp[lhs_pos].d;
                             }
                             ++rhs_pos;
@@ -254,6 +298,7 @@ int main (int argc, char* argv[]) {
 
     for(size_t l = 0; l < (*sequences).size(); l++){
         //call_snps(l, (*overlaps)[l]);
+
         futures.emplace_back(threads->Submit(
                 [&](size_t l){
                     call_snps(l, (*overlaps)[l]);
@@ -266,6 +311,7 @@ int main (int argc, char* argv[]) {
     for(auto &future: futures){
         future.wait();
     }
+
 
     std::cout<<annotations.size()<<std::endl;
 
@@ -283,7 +329,7 @@ int main (int argc, char* argv[]) {
         outdata << std::endl;
     }
 
-    std::string out_file = "overlaps_hifiasm.paf";
+    std::string out_file = "hifiasm_overlapsPA.paf";
     printPaf(overlaps, sequences, out_file);
 
 

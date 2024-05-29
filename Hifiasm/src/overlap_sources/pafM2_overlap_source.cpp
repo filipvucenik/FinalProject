@@ -2,9 +2,6 @@
 #include "bioparser/fasta_parser.hpp"
 #include "biosoup/nucleic_acid.hpp"
 #include "biosoup/overlap.hpp"
-#include "thread_pool/thread_pool.hpp"
-#include "edlib.h"
-
 
 #include <iostream>
 #include <string>
@@ -13,15 +10,13 @@
 #include <vector>
 #include <unordered_map>
 
-std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
-
-class PafOverlapSource : public OverlapSource{
-private:
-    std::vector<std::vector<biosoup::Overlap>> overlaps;
-    std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
-    std::string reads;
-    std::string paf_file;
-    std::unordered_map<std::string , size_t> sequence_id;
+class PafM2OverlapSource : public OverlapSource{
+    private:
+        std::vector<std::vector<biosoup::Overlap>> overlaps;
+        std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
+        std::string reads;
+        std::string paf_file;
+        std::unordered_map<std::string , size_t> sequence_id;
 
     std::unique_ptr<bioparser::Parser<biosoup::NucleicAcid>> create_parser(std::string& path){
         auto is_suffix = [] (const std::string& s, const std::string& suff) {
@@ -64,30 +59,22 @@ private:
 
     }
 
-    size_t find_id(std::string overlap_name){
-        for(auto& it : sequences){
-            if(overlap_name == it->name){
-                return it->id;
-            }
-        }
-        return -1;
-    }
-
     void load_paf(){
         std::string line;
         std::ifstream fileStream(paf_file);
-        std::cout<<"Loading paf file"<<std::endl;
-        std::string tmp;
         while(std::getline(fileStream, line)){
             std::istringstream iss(line);
             std::string v;
             std::vector<std::string> variables;
+
             while(std::getline(iss, v, '\t')){
                 variables.push_back(v);
             }
 
             size_t id_l = sequence_id[variables[0]];
             size_t id_r = sequence_id[variables[5]];
+            std::string tmp = variables[21];
+
 
             overlaps[id_l].emplace_back(id_l,
                                         std::stoi(variables[2]),
@@ -96,50 +83,10 @@ private:
                                         std::stoi(variables[7]),
                                         std::stoi(variables[8]),
                                         255,
-                                        tmp,
-                                        variables[4] == "+");
+                                        tmp.substr(5, tmp.size() - 5),
+                                        variables[4] == "+"
+            );
         }
-
-        std::cout<<"Loaded paf file"<<std::endl;
-        auto edlib_wrapper = [&](
-                std::uint32_t i,
-                const biosoup::Overlap &it,
-                const std::string &lhs,
-                const std::string &rhs) -> std::string {
-            std::string cigar_alignment = "";
-            EdlibAlignResult result = edlibAlign(
-                    lhs.c_str(), lhs.size(),
-                    rhs.c_str(), rhs.size(),
-                    edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
-            if (result.status == EDLIB_STATUS_OK) {
-                cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
-                edlibFreeAlignResult(result);
-                return cigar_alignment;
-            } else {
-                edlibFreeAlignResult(result);
-                std::string cigar_alignment = "";
-                return cigar_alignment;
-            }
-        };
-        auto threads = std::make_shared<thread_pool::ThreadPool>(64);
-        std::vector<std::future<void>> futures;
-        for(size_t i = 0; i < overlaps.size(); i++){
-                futures.emplace_back(threads->Submit([&](size_t i)->void{
-                    for(size_t j = 0; j < overlaps[i].size(); j++){
-                        auto lhs = sequences[i]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin);
-                        biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin));
-                        if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
-                        auto rhs = rhs_.InflateData();
-                        overlaps[i][j].alignment = edlib_wrapper(i, overlaps[i][j], lhs, rhs);
-                    }
-                }, i));
-        }
-
-        for(auto& future: futures){
-            future.wait();
-        }
-        std::cout<<"pairwise alignment done"<<std::endl;
-
     }
 
 public:
@@ -156,7 +103,7 @@ public:
         return &sequences;
     }
 
-    explicit PafOverlapSource(std::string& args)
+    explicit PafM2OverlapSource(std::string& args)
     {
         std::cout<<"args: "<<args<<std::endl;
         auto spacePos = std::find(args.begin(), args.end(), ' ');
@@ -170,5 +117,5 @@ public:
 };
 
 extern "C" OverlapSource* __attribute__((visibility("default"))) create(std::string& args){
-    return (OverlapSource*) new PafOverlapSource(args);
+    return (OverlapSource*) new PafM2OverlapSource(args);
 }
