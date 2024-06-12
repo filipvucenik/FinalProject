@@ -16,7 +16,7 @@
 
 
 
-std::uint8_t use_frequencies = 0;
+std::uint8_t use_frequencies = 1;
 std::uint8_t variant_call_th = 3;
 double freq_low_th = 0.333;
 double freq_high_th = 0.667;
@@ -42,11 +42,24 @@ struct snp_position {
     size_t position;
     base_pile pile;
 };
+struct informative_position{
+    std::uint32_t informative;
+    std::uint32_t informative_matches;
+    std::uint32_t informative_mismatches;
+};
 
-void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences, std::string& out_file){
+void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<std::unique_ptr<biosoup::NucleicAcid>>* sequences, std::string& out_file, std::vector<std::vector<informative_position>> &informative_positions){
     std::ofstream os(out_file);
+    std::uint32_t i = 0;
     for (const auto &it: *overlaps) {
+        std::uint32_t j = 0;
         for (const auto &jt: it) {
+            std::string positions = "";
+            bool haplotypes = false;
+            if(informative_positions[i][j].informative != 0 && informative_positions[i][j].informative_matches){
+                haplotypes = (double)informative_positions[i][j].informative_matches / informative_positions[i][j].informative < 0.8;
+            }
+            positions = std::to_string(informative_positions[i][j].informative_matches) + "/" + std::to_string(informative_positions[i][j].informative);
             os << (*sequences)[jt.lhs_id]->name
                << "\t" << (*sequences)[jt.lhs_id]->inflated_len  // length
                << "\t" << jt.lhs_begin
@@ -59,48 +72,20 @@ void printPaf(std::vector<std::vector<biosoup::Overlap>>* overlaps, std::vector<
                << "\t" << 255 // residue matches
                << "\t" << 255 // alignment block length
                << "\t" << jt.alignment
+               << "\t" << haplotypes
+               << "\t" << positions
                << std::endl;
+            j++;
         }
+        i++;
     }
 }
 
 
+
+
 int main (int argc, char* argv[]) {
 
-    //edlib debugging
-    /*
-    std::string s1 = "TTTTGCGCAACAAAGTCGTTTTAGATAATGCGAAAAAACAGCCTTTCCGGTACTCTACGGCGGTTTTAT";
-    std::string s2 = "TCTTTAACAACAAAATAGATTAACCAACCTAATGAAAAACAAATGAATTTAGCCAATCATTAAGATAAATCAGCGATTTTGCGCAACAAAGTCGTTTTAGATAATGCG";
-    std::string s3 = "TTTTGCGCAACAAAGTCGTTTT";
-
-    EdlibAlignResult result = edlibAlign(
-            s1.c_str(), s1.size(),
-            s2.c_str(), s2.size(),
-            edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
-    std::string cigar_alignment = "";
-    if (result.status == EDLIB_STATUS_OK) {
-        cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
-        edlibFreeAlignResult(result);
-    } else {
-        edlibFreeAlignResult(result);
-        std::string cigar_alignment = "";
-    }
-
-    std::cout<<cigar_alignment<<std::endl;
-
-    EdlibAlignResult result1 = edlibAlign(
-            s1.c_str(), s1.size(),
-            s3.c_str(), s3.size(),
-            edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
-    if (result1.status == EDLIB_STATUS_OK) {
-        cigar_alignment = edlibAlignmentToCigar(result1.alignment, result1.alignmentLength, EDLIB_CIGAR_EXTENDED);
-        edlibFreeAlignResult(result1);
-    } else {
-        edlibFreeAlignResult(result1);
-        std::string cigar_alignment = "";
-    }
-    std::cout<<cigar_alignment<<std::endl;
-     */
     std::filesystem::path currentDir = std::filesystem::current_path();
     if (argc < 3) {
         std::cout << usage;
@@ -121,7 +106,17 @@ int main (int argc, char* argv[]) {
     std::vector<std::vector<biosoup::Overlap>>* overlaps = os->get_overlaps();
     std::vector<std::unordered_set<std::uint32_t>> annotations((*sequences).size());
     std::vector<std::vector<snp_position>> snp_positions(50);
-    std::cout<<"setup finished overlaps"<<(*overlaps).size()<<std::endl;
+
+    std::vector<std::vector<informative_position>> informative_positions((*overlaps).size());
+
+
+
+    for(std::size_t i = 0; i < informative_positions.size(); i++){
+        for(size_t j = 0; j < (*overlaps)[i].size(); j++){
+            informative_positions[i].emplace_back();
+        }
+    }
+    std::cout<<"setup finished overlaps "<<(*overlaps).size()<<std::endl;
 
     auto cigar_to_edlib_alignment = [](const std::string &s) -> std::string {
         std::string rs = "";
@@ -181,7 +176,6 @@ int main (int argc, char* argv[]) {
         std::uint32_t seq_inflated_len = (*sequences)[i]->inflated_len;
         std::vector<base_pile> base_pile_tmp(seq_inflated_len);
         std::vector<std::uint32_t> cov;
-
         for (auto &ovlp: ovlps_final) {
             if (!(ovlp.alignment.empty())) {
                 std::uint32_t lhs_pos = ovlp.lhs_begin;
@@ -194,13 +188,7 @@ int main (int argc, char* argv[]) {
 
                 std::string edlib_alignment = cigar_to_edlib_alignment(ovlp.alignment);
 
-
-
                 for (auto &edlib_align: edlib_alignment) {
-                    if(lhs_pos == 1){
-                        bool  flag;
-                        flag = true;
-                    }
                     switch (edlib_align) {
                         case 0:
                         case 3: {
@@ -243,6 +231,70 @@ int main (int argc, char* argv[]) {
             }
         }
 
+        std::uint32_t o = 0;
+        for(auto &ovlp: ovlps_final){
+            std::uint32_t counter_informative = 0;
+            std::uint32_t counter_informative_matches = 0;
+            std::uint32_t counter_informative_mismatches = 0;
+            if (!(ovlp.alignment.empty())) {
+                std::uint32_t lhs_pos = ovlp.lhs_begin;
+                std::uint32_t rhs_pos = 0;
+                biosoup::NucleicAcid rhs{"",
+                                         (*sequences)[ovlp.rhs_id]->InflateData(ovlp.rhs_begin,
+                                                                                ovlp.rhs_end - ovlp.rhs_begin)};
+                if (!ovlp.strand) rhs.ReverseAndComplement();
+                std::string rhs_tmp = rhs.InflateData();
+
+                std::string edlib_alignment = cigar_to_edlib_alignment(ovlp.alignment);
+
+                for (auto &edlib_align: edlib_alignment) {
+                    switch (edlib_align) {
+                        case 0:{
+                            std::uint32_t most_occuring = std::max(base_pile_tmp[lhs_pos].a, std::max(base_pile_tmp[lhs_pos].c, std::max(base_pile_tmp[lhs_pos].g, base_pile_tmp[lhs_pos].t)));
+                            std::uint32_t pile_size = base_pile_tmp[lhs_pos].a + base_pile_tmp[lhs_pos].c + base_pile_tmp[lhs_pos].g + base_pile_tmp[lhs_pos].t;
+                            if((double) most_occuring / pile_size < 0.8){
+                                counter_informative++;
+                                counter_informative_matches++;
+                            }
+
+                            ++lhs_pos;
+                            ++rhs_pos;
+                            break;
+                        }
+                        case 3: {
+                            std::uint32_t most_occuring = std::max(base_pile_tmp[lhs_pos].a, std::max(base_pile_tmp[lhs_pos].c, std::max(base_pile_tmp[lhs_pos].g, base_pile_tmp[lhs_pos].t)));
+                            std::uint32_t pile_size = base_pile_tmp[lhs_pos].a + base_pile_tmp[lhs_pos].c + base_pile_tmp[lhs_pos].g + base_pile_tmp[lhs_pos].t;
+                            if((double) most_occuring / pile_size < 0.8){
+                                counter_informative++;
+                                counter_informative_mismatches++;
+                            }
+                            ++lhs_pos;
+                            ++rhs_pos;
+                            break;
+                        }
+                        case 1: {
+                            ++base_pile_tmp[lhs_pos].i;
+                            ++lhs_pos;
+                            break;
+                        }
+                        case 2: {
+                            if (lhs_pos < base_pile_tmp.size()) {
+                                ++base_pile_tmp[lhs_pos].d;
+                            }
+                            ++rhs_pos;
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+                informative_positions[i][o].informative = counter_informative;
+                informative_positions[i][o].informative_matches = counter_informative_matches;
+                informative_positions[i][o].informative_mismatches = counter_informative_mismatches;
+            }
+            o++;
+        }
+
         cov.reserve(base_pile_tmp.size());
         for (const auto &jt: base_pile_tmp) {
             //cov.emplace_back(jt.a + jt.c + jt.g + jt.t);
@@ -264,7 +316,6 @@ int main (int argc, char* argv[]) {
             if(i < 50){
                 snp_positions[i].push_back({i, j, jt});
             }
-
 
             double sum = std::accumulate(counts.begin(), counts.end(), 0);
 
@@ -292,25 +343,30 @@ int main (int argc, char* argv[]) {
             };
             ++j;
         };
+
+
+
     };
     auto threads = std::make_shared<thread_pool::ThreadPool>(64);
     std::vector<std::future<void>> futures;
 
     for(size_t l = 0; l < (*sequences).size(); l++){
-        //call_snps(l, (*overlaps)[l]);
-
+        call_snps(l, (*overlaps)[l]);
+        /*
         futures.emplace_back(threads->Submit(
                 [&](size_t l){
                     call_snps(l, (*overlaps)[l]);
                 },l
                 ));
-
-
+        */
     }
 
     for(auto &future: futures){
         future.wait();
     }
+
+    std::string out_file = "hifiasm_overlapsPA_nanosim.paf";
+    printPaf(overlaps, sequences, out_file, informative_positions);
 
 
     std::cout<<annotations.size()<<std::endl;
@@ -329,12 +385,11 @@ int main (int argc, char* argv[]) {
         outdata << std::endl;
     }
 
-    std::string out_file = "hifiasm_overlapsPA.paf";
-    printPaf(overlaps, sequences, out_file);
-
-
+    /*
     std::ofstream pile_file;
     pile_file.open("pile.txt");
+    */
+
 
     for(auto &it: snp_positions){
         if(it.empty()){
@@ -342,11 +397,13 @@ int main (int argc, char* argv[]) {
         }
         size_t ind = it[0].sequence_ind;
         std::string seq = (*sequences)[ind]->InflateData();
+        /*
         pile_file <<"sequence: "<< ind << std::endl;
        // pile_file<<seq<<std::endl;
         for(auto jt: it){
             pile_file<<seq[jt.position]<<"|a:"<<jt.pile.a<<"c:"<<jt.pile.c<<"g:"<<jt.pile.g<<"t:"<<jt.pile.t<<"i:"<<jt.pile.i<<"d:"<<jt.pile.d<<std::endl;
         }
+         */
     }
     return 0;
 
