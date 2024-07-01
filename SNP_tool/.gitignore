@@ -2,7 +2,7 @@ cmake-build-debug
 .idea
 samples
 hifiasm_overlaps.paf
-hifiasm_overlapsPA.paf
+hifiasm_overlapsPA_15c.paf
 hifiasm_overlaps_15c.paf
 hifiasm_overlaps_old.paf
 hifiasm_overlapsPA_15c.paf

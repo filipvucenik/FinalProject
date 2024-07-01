@@ -127,10 +127,22 @@ private:
                 futures.emplace_back(threads->Submit([&](size_t i)->void{
                     for(size_t j = 0; j < overlaps[i].size(); j++){
                         auto lhs = sequences[i]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin);
-                        biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin));
+                        biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].rhs_begin, overlaps[i][j].rhs_end - overlaps[i][j].rhs_begin));
                         if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
                         auto rhs = rhs_.InflateData();
+                        /*
+                        if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated") {
+                            std::cout << lhs << std::endl;
+                            std::cout << rhs << std::endl;
+                        }
+                         */
                         overlaps[i][j].alignment = edlib_wrapper(i, overlaps[i][j], lhs, rhs);
+                        /*
+                        if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated"){
+                            std::cout<<overlaps[i][j].alignment<<std::endl;
+                            std::cout<<"-----------------------------------------"<<std::endl;
+                        }
+                         */
                     }
                 }, i));
         }

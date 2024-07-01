@@ -86,7 +86,7 @@ private:
             size_t id_l = sequence_id[variables[0]];
             size_t id_r = sequence_id[variables[5]];
 
-            if(variables.size() == 12){
+            if(variables.size() >= 12){
                 tmp = variables[11];
             }else{
                 tmp = "";
