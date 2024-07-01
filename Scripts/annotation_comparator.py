@@ -6,7 +6,10 @@ def load_true_annotations(path):
     try:
         with open(path, 'r') as file:
             for line in file:
+                line = line.replace("\n", "")
                 split = line.split(" ")
+                if split[-1] == "":
+                    split = split[:-1]
                 ret.append([int(num) for num in split])
     except FileNotFoundError:
         print(f"File '{path}' not found.")

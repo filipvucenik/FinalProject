@@ -78,7 +78,6 @@ def main():
         for j in range(lower_bound_ind, upper_bound_ind + 1):
             positions.append(str(mutations[j] - lower_bound))
         output.append(str(int(read.split(",")[0].split("=")[1]) - 1) + " " + " ".join(positions))
-
     with open(output_file, 'w') as file:
         for line in output:
             file.write(line + "\n")
