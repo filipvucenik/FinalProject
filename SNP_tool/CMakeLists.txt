@@ -127,9 +127,12 @@ endif ()
 
 set_target_properties(ram PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+include_directories( ${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
+
 add_executable(snp
         src/snp_main.cpp)
 
+add_library(overlap_source INTERFACE)
 add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
 add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
 add_library(pafEDL_overlap_source SHARED src/overlap_sources/pafEDL_overlap_source.cpp)
@@ -147,6 +150,12 @@ target_include_directories(ram_overlap_source PUBLIC
         ${ram_INCLUDE_DIRS}
         ${edlib_INCLUDE_DIRS}
         )
+
+
+target_include_directories(overlap_source INTERFACE
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS})
 
 target_link_libraries(ram_overlap_source
         bioparser::bioparser
