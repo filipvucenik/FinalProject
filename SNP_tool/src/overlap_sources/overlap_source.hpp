@@ -5,8 +5,8 @@
 #include <string>
 #include <memory>
 
-#include "biosoup/overlap.hpp"
-#include "biosoup/nucleic_acid.hpp"
+#include "../../out/build/Preset/_deps/biosoup-src/include/biosoup/overlap.hpp"
+#include "../../out/build/Preset/_deps/biosoup-src/include/biosoup/nucleic_acid.hpp"
 
 class OverlapSource
 {
@@ -16,5 +16,5 @@ public:
     virtual ~OverlapSource() = default;
 };
 
-// extern "C" OverlapSource *__attribute__((visibility("default"))) create(std::string &args);
+extern "C" OverlapSource *__attribute__((visibility("default"))) create(std::string &args);
 #endif // OVERLAP_SOURCE_HPP

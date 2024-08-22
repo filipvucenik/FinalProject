@@ -3,7 +3,8 @@
 #include "biosoup/nucleic_acid.hpp"
 #include "biosoup/overlap.hpp"
 #include "thread_pool/thread_pool.hpp"
-#include "edlib.h"
+#include "bindings/cpp/WFAligner.hpp"
+using namespace wfa;
 
 #include <iostream>
 #include <string>
@@ -11,10 +12,11 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <cmath>
 
 std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
 
-class PafOverlapSource : public OverlapSource
+class PafWFA2OverlapSource : public OverlapSource
 {
 private:
     std::vector<std::vector<biosoup::Overlap>> overlaps;
@@ -118,28 +120,56 @@ private:
         }
 
         std::cout << "Loaded paf file" << std::endl;
-        auto edlib_wrapper = [&](
-                                 std::uint32_t i,
-                                 const biosoup::Overlap &it,
-                                 const std::string &lhs,
-                                 const std::string &rhs) -> std::string
+        auto wfa2_wrapper = [&](
+                                std::uint32_t i,
+                                const biosoup::Overlap &it,
+                                const std::string &lhs,
+                                const std::string &rhs) -> std::string
         {
-            std::string cigar_alignment = "";
-            EdlibAlignResult result = edlibAlign(
-                lhs.c_str(), lhs.size(),
-                rhs.c_str(), rhs.size(),
-                edlibNewAlignConfig(-1, EDLIB_MODE_NW, EDLIB_TASK_PATH, nullptr, 0)); // align lhs and rhs
-            if (result.status == EDLIB_STATUS_OK)
+            WFAlignerGapAffine aligner(4, 6, 2, WFAligner::Alignment, WFAligner::MemoryHigh);
+            aligner.alignEnd2End(lhs.c_str(), lhs.size(), rhs.c_str(), rhs.size());
+            std::string alignment = aligner.getAlignment();
+            std::size_t lhs_i = 0;
+            std::size_t rhs_i = 0;
+            std::string cigar_string = "";
+            for (std::size_t i = 0; i < alignment.size(); i++)
             {
-                cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
-                edlibFreeAlignResult(result);
-                return cigar_alignment;
-            }
-            else
-            {
-                edlibFreeAlignResult(result);
-                std::string cigar_alignment = "";
-                return cigar_alignment;
+                std::size_t len = std::stoi(alignment.substr(i));
+                std::size_t skip = std::floor(std::log10(len)) + 1;
+                if (alignment[i + skip] == 'M')
+                {
+                    bool match = true;
+                    std::size_t inarw_count = 0;
+                    for (std::size_t k = 0; k < len; k++)
+                    {
+                        if (lhs[lhs_i + k] != rhs[rhs_i + k] && match)
+                        {
+                            cigar_string += std::to_string(inarw_count) + "=";
+                            inarw_count = 0;
+                            match = false;
+                        }
+                        else if (lhs[lhs_i + k] == rhs[rhs_i + k] && !match)
+                        {
+                            cigar_string += std::to_string(inarw_count) + "X";
+                            inarw_count = 0;
+                            match = true;
+                        }
+                        inarw_count++;
+                    }
+                    lhs_i += len;
+                    rhs_i += len;
+                }
+                else if (alignment[i + skip] == 'I')
+                {
+                    cigar_string += std::to_string(len) + "I";
+                    rhs_i += len;
+                }
+                else if (alignment[i + skip] == 'D')
+                {
+                    cigar_string += std::to_string(len) + "D";
+                    lhs_i += len;
+                }
+                i += skip;
             }
         };
         auto threads = std::make_shared<thread_pool::ThreadPool>(64);
@@ -159,7 +189,7 @@ private:
                             std::cout << rhs << std::endl;
                         }
                          */
-                        overlaps[i][j].alignment = edlib_wrapper(i, overlaps[i][j], lhs, rhs);
+                        overlaps[i][j].alignment = wfa2_wrapper(i, overlaps[i][j], lhs, rhs);
                         /*
                         if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated"){
                             std::cout<<overlaps[i][j].alignment<<std::endl;
@@ -177,7 +207,8 @@ private:
     }
 
 public:
-    std::vector<std::vector<biosoup::Overlap>> *get_overlaps() override
+    std::vector<std::vector<biosoup::Overlap>> *
+    get_overlaps() override
     {
         if (overlaps.empty())
         {
@@ -192,7 +223,7 @@ public:
         return &sequences;
     }
 
-    explicit PafOverlapSource(std::string &args)
+    explicit PafWFA2OverlapSource(std::string &args)
     {
         std::cout << "args: " << args << std::endl;
         auto spacePos = std::find(args.begin(), args.end(), ' ');
@@ -206,14 +237,5 @@ public:
 
 extern "C" OverlapSource *__attribute__((visibility("default"))) create(std::string &args)
 {
-    return (OverlapSource *)new PafOverlapSource(args);
+    return (OverlapSource *)new PafWFA2OverlapSource(args);
 }
-
-// int main()
-// {
-//     std::string args = "../samples/E-coli_reads_15c.fasta ../hifiasm_overlaps_15c.paf";
-//     std::unique_ptr<OverlapSource> source(create(args));
-//     auto overlaps = source->get_overlaps();
-//     auto sequences = source->get_sequences();
-//     std::cout << "done" << std::endl;
-// }

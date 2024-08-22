@@ -6,10 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/snp",
-            "args": [
-                "arg1",
-                "arg2"
-            ],
+            "args": ["lib","arg"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

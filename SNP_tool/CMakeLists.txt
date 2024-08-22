@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 
-project(hifiasm
+project(SNP_tool
         VERSION 1.0
         DESCRIPTION ""
         LANGUAGES CXX
@@ -125,22 +125,41 @@ if (NOT edlib_FOUND)
     endif ()
 endif ()
 
+# adding WFA2 
+find_package(wfa2 1.2.7 QUIET)
+if (NOT wfa2_FOUND)
+    FetchContent_Declare(
+            wfa2
+            GIT_REPOSITORY https://github.com/smarco/WFA2-lib
+            GIT_TAG v2.3.5)
+
+    FetchContent_GetProperties(wfa2)
+    if (NOT wfa2_POPULATED)
+        FetchContent_Populate(wfa2)
+        add_subdirectory(
+                ${wfa2_SOURCE_DIR}
+                ${wfa2_BINARY_DIR}
+                EXCLUDE_FROM_ALL)
+    endif ()
+endif ()
+
 set_target_properties(ram PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-include_directories( ${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
+include_directories(${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
 
 add_executable(snp
         src/snp_main.cpp)
 
+
 # add_library(overlap_source INTERFACE)
-# add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
-# add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
-# add_library(pafEDL_overlap_source SHARED src/overlap_sources/pafEDL_overlap_source.cpp)
+#add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
+add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
+add_library(pafEDL_overlap_source SHARED src/overlap_sources/pafEDL_overlap_source.cpp)
 # add_library(pafPA_overlap_source SHARED src/overlap_sources/pafPA_overlap_source.cpp)
 # add_library(pafM2_overlap_source SHARED src/overlap_sources/pafM2_overlap_source.cpp)
-# add_library(pafKSW2_overlap_source SHARED src/overlap_sources/pafKSW2_overlap_source.cpp
-#         src/overlap_sources/pafKSW2_overlap_source.cpp)
-
+add_library(pafKSW2_overlap_source SHARED src/overlap_sources/pafKSW2_overlap_source.cpp)
+# add_library(ksw2 STATIC src/overlap_sources/ksw2_gg2_sse.c)
+add_library(pafWFA2_overlap_source SHARED src/overlap_sources/pafWFA2_overlap_source.cpp)
 
 # target_include_directories(ram_overlap_source PUBLIC
 #         ${PROJECT_SOURCE_DIR}/include
@@ -165,24 +184,47 @@ add_executable(snp
 #         edlib::edlib
 #         )
 
-# target_include_directories(pafEDL_overlap_source PUBLIC
-#         ${PROJECT_SOURCE_DIR}/include
-#         ${bioparser_INCLUDE_DIRS}
-#         ${biosoup_INCLUDE_DIRS}
-#         )
+target_include_directories(pafEDL_overlap_source PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS}
+        )
 
-# target_link_libraries(pafEDL_overlap_source
-#         bioparser::bioparser
-#         biosoup::biosoup
-#         thread_pool::thread_pool
-#         edlib::edlib
-# )
+target_link_libraries(pafEDL_overlap_source
+        bioparser::bioparser
+        biosoup::biosoup
+        thread_pool::thread_pool
+        edlib::edlib
+)
 
-# target_link_libraries(pafKSW2_overlap_source
-#         bioparser::bioparser
-#         biosoup::biosoup
-#         thread_pool::thread_pool
-# )
+target_include_directories(pafWFA2_overlap_source PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS}
+        ${wfa2_INCLUDE_DIRS}
+        )
+
+
+target_link_libraries(pafWFA2_overlap_source
+        bioparser::bioparser
+        biosoup::biosoup
+        thread_pool::thread_pool
+        wfa2::wfa2
+)
+
+target_include_directories(pafKSW2_overlap_source PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${bioparser_INCLUDE_DIRS}
+        ${biosoup_INCLUDE_DIRS}
+        )
+
+target_link_libraries(pafKSW2_overlap_source
+        bioparser::bioparser
+        biosoup::biosoup
+        thread_pool::thread_pool
+)
+
+
 
 # target_include_directories( pafPA_overlap_source PUBLIC
 #         ${PROJECT_SOURCE_DIR}/include
@@ -218,5 +260,6 @@ target_link_libraries(snp
         thread_pool::thread_pool
         ram::ram
         edlib::edlib
+        overlap_source_factory
         ${CMAKE_DL_LIBS}
         )

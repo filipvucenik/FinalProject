@@ -88,26 +88,30 @@ void printPaf(std::vector<std::vector<biosoup::Overlap>> *overlaps, std::vector<
 
 int main(int argc, char *argv[])
 {
-
+    // std::cout << "argv: " << argv[0] << " argc:" << argc << std::endl;
     std::filesystem::path currentDir = std::filesystem::current_path();
-    if (argc < 3)
-    {
-        std::cout << usage;
-        exit(1);
-    }
-    std::string lib = argv[1];
-    std::string arg = argv[2];
-    if (argc > 3)
-    {
-        for (int i = 3; i < argc; i++)
-        {
-            arg += " ";
-            arg += argv[i];
-        }
-    }
+    // if (argc < 3)
+    // {
+    //     std::cout << usage;
+    //     exit(1);
+    // }
+    // std::string lib = argv[1];
+    // std::string arg = argv[2];
+    // if (argc > 3)
+    // {
+    //     for (int i = 3; i < argc; i++)
+    //     {
+    //         arg += " ";
+    //         arg += argv[i];
+    //     }
+    // }
+    std::cout << "currentDir: " << currentDir << std::endl;
+    std::string args = "../../../../samples/E-coli_reads_15c.fasta ../../../../hifiasm_overlaps_15c.paf";
+    std::string lib = "pafWFA2";
+    std::string sample = "E-Coli";
 
     // OverlapSource *os = create_overlap_source(lib, arg);
-    std::unique_ptr<OverlapSource> os;
+    std::unique_ptr<OverlapSource> os(create_overlap_source(lib, args));
 
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> *sequences = os->get_sequences();
     std::cout << "sequences loaded sequences" << (*sequences).size() << std::endl;
@@ -405,14 +409,14 @@ int main(int argc, char *argv[])
 
     for (size_t l = 0; l < (*sequences).size(); l++)
     {
-        call_snps(l, (*overlaps)[l]);
-        /*
+        // call_snps(l, (*overlaps)[l]);
+
         futures.emplace_back(threads->Submit(
-                [&](size_t l){
-                    call_snps(l, (*overlaps)[l]);
-                },l
-                ));
-        */
+            [&](size_t l)
+            {
+                call_snps(l, (*overlaps)[l]);
+            },
+            l));
     }
 
     for (auto &future : futures)
@@ -420,7 +424,9 @@ int main(int argc, char *argv[])
         future.wait();
     }
 
-    std::string out_file = "hifiasm_overlapsPA_nanosim.paf";
+    std::string out_file = "hifiasm_overlapsPA_" + sample + "_" + lib + ".paf ";
+    std::cout
+        << "Writnig to file: " << out_file << std::endl;
     printPaf(overlaps, sequences, out_file, informative_positions);
 
     std::cout << annotations.size() << std::endl;
@@ -442,26 +448,23 @@ int main(int argc, char *argv[])
         outdata << std::endl;
     }
 
-    /*
-    std::ofstream pile_file;
-    pile_file.open("pile.txt");
-    */
+    // std::ofstream pile_file;
+    // pile_file.open("pile.txt");
 
-    for (auto &it : snp_positions)
-    {
-        if (it.empty())
-        {
-            continue;
-        }
-        size_t ind = it[0].sequence_ind;
-        std::string seq = (*sequences)[ind]->InflateData();
-        /*
-        pile_file <<"sequence: "<< ind << std::endl;
-       // pile_file<<seq<<std::endl;
-        for(auto jt: it){
-            pile_file<<seq[jt.position]<<"|a:"<<jt.pile.a<<"c:"<<jt.pile.c<<"g:"<<jt.pile.g<<"t:"<<jt.pile.t<<"i:"<<jt.pile.i<<"d:"<<jt.pile.d<<std::endl;
-        }
-         */
-    }
+    // for (auto &it : snp_positions)
+    // {
+    //     if (it.empty())
+    //     {
+    //         continue;
+    //     }
+    //     size_t ind = it[0].sequence_ind;
+    //     std::string seq = (*sequences)[ind]->InflateData();
+    //     pile_file <<"sequence: "<< ind << std::endl;
+    //    // pile_file<<seq<<std::endl;
+    //     for(auto jt: it){
+    //         pile_file<<seq[jt.position]<<"|a:"<<jt.pile.a<<"c:"<<jt.pile.c<<"g:"<<jt.pile.g<<"t:"<<jt.pile.t<<"i:"<<jt.pile.i<<"d:"<<jt.pile.d<<std::endl;
+    //     }
+
+    // }
     return 0;
 }
