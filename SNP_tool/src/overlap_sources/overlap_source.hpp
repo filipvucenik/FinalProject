@@ -1,3 +1,6 @@
+#ifndef OVERLAP_SOURCE_HPP
+#define OVERLAP_SOURCE_HPP
+
 #include <vector>
 #include <string>
 #include <memory>
@@ -13,4 +16,5 @@ public:
     virtual ~OverlapSource() = default;
 };
 
-extern "C" OverlapSource *__attribute__((visibility("default"))) create(std::string &args);
+// extern "C" OverlapSource *__attribute__((visibility("default"))) create(std::string &args);
+#endif // OVERLAP_SOURCE_HPP

@@ -132,76 +132,76 @@ include_directories( ${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
 add_executable(snp
         src/snp_main.cpp)
 
-add_library(overlap_source INTERFACE)
-add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
-add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
-add_library(pafEDL_overlap_source SHARED src/overlap_sources/pafEDL_overlap_source.cpp)
-add_library(pafPA_overlap_source SHARED src/overlap_sources/pafPA_overlap_source.cpp)
-add_library(pafM2_overlap_source SHARED src/overlap_sources/pafM2_overlap_source.cpp)
-add_library(pafKSW2_overlap_source SHARED src/overlap_sources/pafKSW2_overlap_source.cpp
-        src/overlap_sources/pafKSW2_overlap_source.cpp)
+# add_library(overlap_source INTERFACE)
+# add_library(ram_overlap_source SHARED src/overlap_sources/ram_overlap_source.cpp)
+# add_library(overlap_source_factory STATIC src/overlap_sources/overlap_source_factory.cpp)
+# add_library(pafEDL_overlap_source SHARED src/overlap_sources/pafEDL_overlap_source.cpp)
+# add_library(pafPA_overlap_source SHARED src/overlap_sources/pafPA_overlap_source.cpp)
+# add_library(pafM2_overlap_source SHARED src/overlap_sources/pafM2_overlap_source.cpp)
+# add_library(pafKSW2_overlap_source SHARED src/overlap_sources/pafKSW2_overlap_source.cpp
+#         src/overlap_sources/pafKSW2_overlap_source.cpp)
 
 
-target_include_directories(ram_overlap_source PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-        ${bioparser_INCLUDE_DIRS}
-        ${biosoup_INCLUDE_DIRS}
-        ${thread_pool_INCLUDE_DIRS}
-        ${ram_INCLUDE_DIRS}
-        ${edlib_INCLUDE_DIRS}
-        )
+# target_include_directories(ram_overlap_source PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include
+#         ${bioparser_INCLUDE_DIRS}
+#         ${biosoup_INCLUDE_DIRS}
+#         ${thread_pool_INCLUDE_DIRS}
+#         ${ram_INCLUDE_DIRS}
+#         ${edlib_INCLUDE_DIRS}
+#         )
 
 
-target_include_directories(overlap_source INTERFACE
-        ${PROJECT_SOURCE_DIR}/include
-        ${bioparser_INCLUDE_DIRS}
-        ${biosoup_INCLUDE_DIRS})
+# target_include_directories(overlap_source INTERFACE
+#         ${PROJECT_SOURCE_DIR}/include
+#         ${bioparser_INCLUDE_DIRS}
+#         ${biosoup_INCLUDE_DIRS})
 
-target_link_libraries(ram_overlap_source
-        bioparser::bioparser
-        biosoup::biosoup
-        thread_pool::thread_pool
-        ram::ram
-        edlib::edlib
-        )
+# target_link_libraries(ram_overlap_source
+#         bioparser::bioparser
+#         biosoup::biosoup
+#         thread_pool::thread_pool
+#         ram::ram
+#         edlib::edlib
+#         )
 
-target_include_directories(pafEDL_overlap_source PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-        ${bioparser_INCLUDE_DIRS}
-        ${biosoup_INCLUDE_DIRS}
-        )
+# target_include_directories(pafEDL_overlap_source PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include
+#         ${bioparser_INCLUDE_DIRS}
+#         ${biosoup_INCLUDE_DIRS}
+#         )
 
-target_link_libraries(pafEDL_overlap_source
-        bioparser::bioparser
-        biosoup::biosoup
-        thread_pool::thread_pool
-        edlib::edlib
-)
+# target_link_libraries(pafEDL_overlap_source
+#         bioparser::bioparser
+#         biosoup::biosoup
+#         thread_pool::thread_pool
+#         edlib::edlib
+# )
 
-target_link_libraries(pafKSW2_overlap_source
-        bioparser::bioparser
-        biosoup::biosoup
-        thread_pool::thread_pool
-)
+# target_link_libraries(pafKSW2_overlap_source
+#         bioparser::bioparser
+#         biosoup::biosoup
+#         thread_pool::thread_pool
+# )
 
-target_include_directories( pafPA_overlap_source PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-        ${biosoup_INCLUDE_DIRS}
-)
-target_link_libraries(pafPA_overlap_source
-        biosoup::biosoup
-        bioparser::bioparser
-)
+# target_include_directories( pafPA_overlap_source PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include
+#         ${biosoup_INCLUDE_DIRS}
+# )
+# target_link_libraries(pafPA_overlap_source
+#         biosoup::biosoup
+#         bioparser::bioparser
+# )
 
-target_include_directories( pafM2_overlap_source PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-        ${biosoup_INCLUDE_DIRS}
-)
+# target_include_directories( pafM2_overlap_source PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include
+#         ${biosoup_INCLUDE_DIRS}
+# )
 
-target_link_libraries(pafM2_overlap_source
-        biosoup::biosoup
-        bioparser::bioparser
-)
+# target_link_libraries(pafM2_overlap_source
+#         biosoup::biosoup
+#         bioparser::bioparser
+# )
 
 target_include_directories(snp PUBLIC
         ${PROJECT_SOURCE_DIR}/include
@@ -218,7 +218,5 @@ target_link_libraries(snp
         thread_pool::thread_pool
         ram::ram
         edlib::edlib
-        overlap_source_factory
-        ram_overlap_source
         ${CMAKE_DL_LIBS}
         )
