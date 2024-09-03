@@ -10,6 +10,7 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <filesystem>
 
 #include <stdint.h>
 
@@ -435,6 +436,16 @@ private:
         std::ifstream fileStream(paf_file);
         std::cout << "Loading paf file" << std::endl;
         std::string tmp;
+
+        if (!fileStream.is_open())
+        {
+            std::cerr << "Error opening file" << std::endl;
+            std::filesystem::path currentPath = std::filesystem::current_path();
+            std::cout << "Current directory: " << currentPath << std::endl;
+            std::cout << "File path: " << paf_file << std::endl;
+            exit(1);
+        }
+
         while (std::getline(fileStream, line))
         {
             std::istringstream iss(line);
@@ -511,8 +522,9 @@ private:
                 &n_cigar,   // int *n_cigar_
                 &cigar);    // uint32_t **cigar_
             std::string cigar_string = "";
-            if (score > 0 && n_cigar > 0)
+            if (n_cigar > 0)
             {
+
                 std::size_t lhs_i = 0;
                 std::size_t rhs_i = 0;
                 for (std::size_t j = 0; j < static_cast<std::size_t>(n_cigar); ++j)
@@ -541,6 +553,10 @@ private:
                             }
                             inarw_count++;
                         }
+                        if (match)
+                            cigar_string += std::to_string(inarw_count) + "=";
+                        else
+                            cigar_string += std::to_string(inarw_count) + "X";
                         lhs_i += count;
                         rhs_i += count;
                         break;
@@ -565,6 +581,7 @@ private:
             free(cigar);
             delete[] rhs_;
             delete[] lhs_;
+
             return cigar_string;
         };
 
@@ -579,6 +596,7 @@ private:
                     biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].rhs_begin, overlaps[i][j].rhs_end - overlaps[i][j].rhs_begin));
                     if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
                     auto rhs = rhs_.InflateData();
+
                     /*
                     if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated") {
                         std::cout << lhs << std::endl;

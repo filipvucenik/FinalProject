@@ -145,7 +145,7 @@ endif ()
 
 set_target_properties(ram PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-include_directories(${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
+# include_directories(${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
 
 add_executable(snp
         src/snp_main.cpp)
@@ -201,7 +201,7 @@ target_include_directories(pafWFA2_overlap_source PUBLIC
         ${PROJECT_SOURCE_DIR}/include
         ${bioparser_INCLUDE_DIRS}
         ${biosoup_INCLUDE_DIRS}
-        ${wfa2_INCLUDE_DIRS}
+        ${wfa2_SOURCE_DIR}/include
         )
 
 
@@ -210,6 +210,11 @@ target_link_libraries(pafWFA2_overlap_source
         biosoup::biosoup
         thread_pool::thread_pool
         wfa2::wfa2
+        edlib::edlib
+)
+
+target_sources(pafWFA2_overlap_source PRIVATE
+    ${wfa2_SOURCE_DIR}/bindings/cpp/WFAligner.cpp  # Example source file
 )
 
 target_include_directories(pafKSW2_overlap_source PUBLIC

@@ -74,6 +74,7 @@
         "__verbose_abort": "cpp",
         "execution": "cpp",
         "locale": "cpp",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "ranges": "cpp"
     }
 }

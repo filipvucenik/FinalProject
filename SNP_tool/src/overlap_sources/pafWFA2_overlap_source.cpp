@@ -4,7 +4,6 @@
 #include "biosoup/overlap.hpp"
 #include "thread_pool/thread_pool.hpp"
 #include "bindings/cpp/WFAligner.hpp"
-using namespace wfa;
 
 #include <iostream>
 #include <string>
@@ -13,8 +12,18 @@ using namespace wfa;
 #include <vector>
 #include <unordered_map>
 #include <cmath>
+#include <filesystem>
 
 std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
+
+enum class operation
+{
+    MATCH,
+    MISMATCH,
+    INSERTION,
+    DELETION,
+    UNDEFINED
+};
 
 class PafWFA2OverlapSource : public OverlapSource
 {
@@ -46,6 +55,23 @@ private:
             }
         }
         return nullptr;
+    }
+
+    std::string op_and_num_to_str(operation op, std::size_t num)
+    {
+        switch (op)
+        {
+        case operation::MATCH:
+            return std::to_string(num) + "=";
+        case operation::MISMATCH:
+            return std::to_string(num) + "X";
+        case operation::DELETION:
+            return std::to_string(num) + "D";
+        case operation::INSERTION:
+            return std::to_string(num) + "I";
+        default:
+            return "";
+        }
     }
 
     void load_sequences()
@@ -92,7 +118,20 @@ private:
     void load_paf()
     {
         std::string line;
+        if (!std::filesystem::exists(paf_file))
+        {
+            std::cerr << "File does not exist: " << paf_file << std::endl;
+        }
         std::ifstream fileStream(paf_file);
+        if (!fileStream.is_open())
+        {
+            std::cerr << "Error opening file" << std::endl;
+            std::filesystem::path currentPath = std::filesystem::current_path();
+            std::cout << "Current directory: " << currentPath << std::endl;
+            std::cout << "File path: " << paf_file << std::endl;
+            exit(1);
+        }
+
         std::cout << "Loading paf file" << std::endl;
         std::string tmp;
         while (std::getline(fileStream, line))
@@ -126,54 +165,149 @@ private:
                                 const std::string &lhs,
                                 const std::string &rhs) -> std::string
         {
-            WFAlignerGapAffine aligner(4, 6, 2, WFAligner::Alignment, WFAligner::MemoryHigh);
+            wfa::WFAlignerGapAffine aligner(4, 6, 2, wfa::WFAligner::Alignment, wfa::WFAligner::MemoryHigh);
             aligner.alignEnd2End(lhs.c_str(), lhs.size(), rhs.c_str(), rhs.size());
             std::string alignment = aligner.getAlignment();
+
             std::size_t lhs_i = 0;
             std::size_t rhs_i = 0;
             std::string cigar_string = "";
+            operation current_op = operation::UNDEFINED;
+            std::size_t inarw_count = 0;
+            for (std::size_t j = 0; j < alignment.size(); j++)
+            {
+                if (alignment[j] == 'M')
+                {
+                    if (current_op != operation::MATCH)
+                    {
+                        cigar_string += op_and_num_to_str(current_op, inarw_count);
+                        current_op = operation::MATCH;
+                        inarw_count = 0;
+                    }
+                    lhs_i++;
+                    rhs_i++;
+                }
+                else if (alignment[j] == 'X')
+                {
+                    if (current_op != operation::MISMATCH)
+                    {
+                        cigar_string += op_and_num_to_str(current_op, inarw_count);
+                        current_op = operation::MISMATCH;
+                        inarw_count = 0;
+                    }
+                    lhs_i++;
+                    rhs_i++;
+                }
+                else if (alignment[j] == 'I')
+                {
+                    if (current_op != operation::INSERTION)
+                    {
+                        cigar_string += op_and_num_to_str(current_op, inarw_count);
+                        current_op = operation::INSERTION;
+                        inarw_count = 0;
+                    }
+                    lhs_i++;
+                }
+                else if (alignment[j] == 'D')
+                {
+                    if (current_op != operation::DELETION)
+                    {
+                        cigar_string += op_and_num_to_str(current_op, inarw_count);
+                        current_op = operation::DELETION;
+                        inarw_count = 0;
+                    }
+                    rhs_i++;
+                }
+                inarw_count++;
+            }
+            cigar_string += op_and_num_to_str(current_op, inarw_count);
+            return cigar_string;
+        };
+
+        auto wfa2_wrapperSGT = [&](
+                                   std::uint32_t i,
+                                   const biosoup::Overlap &it,
+                                   const std::string &lhs,
+                                   const std::string &rhs,
+                                   wfa::WFAlignerGapAffine &aligner) -> std::string
+        {
+            aligner.alignEnd2End(lhs.c_str(), lhs.size(), rhs.c_str(), rhs.size());
+            std::string alignment = aligner.getAlignment();
+
+            std::size_t lhs_i = 0;
+            std::size_t rhs_i = 0;
+            std::string cigar_string = "";
+            operation current_op = operation::UNDEFINED;
+            std::size_t inarw_count = 0;
             for (std::size_t i = 0; i < alignment.size(); i++)
             {
-                std::size_t len = std::stoi(alignment.substr(i));
-                std::size_t skip = std::floor(std::log10(len)) + 1;
-                if (alignment[i + skip] == 'M')
+
+                if (alignment[i] == 'M')
                 {
-                    bool match = true;
-                    std::size_t inarw_count = 0;
-                    for (std::size_t k = 0; k < len; k++)
+                    if (lhs[lhs_i] == rhs[rhs_i])
                     {
-                        if (lhs[lhs_i + k] != rhs[rhs_i + k] && match)
+                        if (current_op != operation::MATCH)
                         {
-                            cigar_string += std::to_string(inarw_count) + "=";
+                            if (current_op != operation::UNDEFINED)
+                            {
+                                cigar_string += op_and_num_to_str(current_op, inarw_count);
+                            }
+                            current_op = operation::MATCH;
                             inarw_count = 0;
-                            match = false;
                         }
-                        else if (lhs[lhs_i + k] == rhs[rhs_i + k] && !match)
-                        {
-                            cigar_string += std::to_string(inarw_count) + "X";
-                            inarw_count = 0;
-                            match = true;
-                        }
-                        inarw_count++;
                     }
-                    lhs_i += len;
-                    rhs_i += len;
+                    else
+                    {
+                        if (current_op != operation::MISMATCH)
+                        {
+                            if (current_op != operation::UNDEFINED)
+                            {
+                                cigar_string += op_and_num_to_str(current_op, inarw_count);
+                            }
+                            current_op = operation::MISMATCH;
+                            inarw_count = 0;
+                        }
+                    }
+                    lhs_i++;
+                    rhs_i++;
                 }
-                else if (alignment[i + skip] == 'I')
+                else if (alignment[i] == 'I')
                 {
-                    cigar_string += std::to_string(len) + "I";
-                    rhs_i += len;
+                    if (current_op != operation::INSERTION)
+                    {
+                        if (current_op != operation::UNDEFINED)
+                        {
+                            cigar_string += op_and_num_to_str(current_op, inarw_count);
+                        }
+                        current_op = operation::INSERTION;
+                        inarw_count = 0;
+                    }
+                    lhs_i++;
                 }
-                else if (alignment[i + skip] == 'D')
+                else if (alignment[i] == 'D')
                 {
-                    cigar_string += std::to_string(len) + "D";
-                    lhs_i += len;
+                    if (current_op != operation::DELETION)
+                    {
+                        if (current_op != operation::UNDEFINED)
+                        {
+                            cigar_string += op_and_num_to_str(current_op, inarw_count);
+                        }
+                        current_op = operation::DELETION;
+                        inarw_count = 0;
+                    }
+                    rhs_i++;
                 }
-                i += skip;
+                inarw_count++;
             }
+            cigar_string += op_and_num_to_str(current_op, inarw_count);
+            return cigar_string;
         };
+
         auto threads = std::make_shared<thread_pool::ThreadPool>(64);
         std::vector<std::future<void>> futures;
+
+        wfa::WFAlignerGapAffine aligner(4, 6, 2, wfa::WFAligner::Alignment, wfa::WFAligner::MemoryHigh);
+
         for (std::size_t i = 0; i < overlaps.size(); i++)
         {
             futures.emplace_back(threads->Submit([&](std::size_t i) -> void
@@ -183,20 +317,22 @@ private:
                         biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].rhs_begin, overlaps[i][j].rhs_end - overlaps[i][j].rhs_begin));
                         if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
                         auto rhs = rhs_.InflateData();
-                        /*
-                        if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated") {
-                            std::cout << lhs << std::endl;
-                            std::cout << rhs << std::endl;
-                        }
-                         */
+
                         overlaps[i][j].alignment = wfa2_wrapper(i, overlaps[i][j], lhs, rhs);
-                        /*
-                        if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated"){
-                            std::cout<<overlaps[i][j].alignment<<std::endl;
-                            std::cout<<"-----------------------------------------"<<std::endl;
-                        }
-                         */
+
                     } }, i));
+
+            // single thread
+            // for (std::size_t j = 0; j < overlaps[i].size(); j++)
+            // {
+            //     auto lhs = sequences[i]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin);
+            //     biosoup::NucleicAcid rhs_("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].rhs_begin, overlaps[i][j].rhs_end - overlaps[i][j].rhs_begin));
+            //     if (!overlaps[i][j].strand)
+            //         rhs_.ReverseAndComplement();
+            //     auto rhs = rhs_.InflateData();
+
+            //     overlaps[i][j].alignment = wfa2_wrapperSGT(i, overlaps[i][j], lhs, rhs, aligner);
+            // }
         }
 
         for (auto &future : futures)

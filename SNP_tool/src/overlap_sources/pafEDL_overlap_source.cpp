@@ -11,6 +11,7 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <filesystem>
 
 std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
 
@@ -93,6 +94,16 @@ private:
         std::ifstream fileStream(paf_file);
         std::cout << "Loading paf file" << std::endl;
         std::string tmp;
+
+        if (!fileStream.is_open())
+        {
+            std::cerr << "Error opening file" << std::endl;
+            std::filesystem::path currentPath = std::filesystem::current_path();
+            std::cout << "Current directory: " << currentPath << std::endl;
+            std::cout << "File path: " << paf_file << std::endl;
+            exit(1);
+        }
+
         while (std::getline(fileStream, line))
         {
             std::istringstream iss(line);
