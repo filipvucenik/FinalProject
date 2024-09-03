@@ -2,3 +2,6 @@ logs
 visualization
 .vscode
 someFiles
+SNP_tool/hifiasm_overlapsPA_E-Coli_Edlib.paf
+SNP_tool/hifiasm_overlapsPA_E-Coli_KSW2.paf
+SNP_tool/hifiasm_overlapsPA_E-Coli_pafKSW2.paf 
