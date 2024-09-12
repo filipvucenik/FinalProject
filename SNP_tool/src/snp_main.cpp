@@ -116,7 +116,6 @@ void printPaf(std::vector<std::vector<biosoup::Overlap>> *overlaps, std::vector<
 
 int main(int argc, char *argv[])
 {
-    // std::cout << "argv: " << argv[0] << " argc:" << argc << std::endl;
     // std::filesystem::path currentDir = std::filesystem::current_path();
     // if (argc < 4)
     // {
@@ -139,12 +138,16 @@ int main(int argc, char *argv[])
     // std::cout << "lib: " << lib << std::endl;
     // std::cout << "sample: " << sample << std::endl;
 
-    std::string arg = "../../../../samples/E-coli_reads_15c.fasta ../../../../hifiasm_overlaps_15c.paf";
+    std::string arg = "../../../../reads/E-coli_reads_15c.fasta ../../../../hifiasmOverlaps/hifiasm_overlaps_15c.paf";
     std::string lib = "pafWFA2";
     std::string sample = "E-Coli";
 
+    // std::string arg = "../../../../reads/chr19_perfect.fasta ../../../../hifiasmOverlaps/chr19_ovlp_perfect.paf";
+    // std::string lib = "pafWFA2";
+    // std::string sample = "chr19_perfect";
     // OverlapSource *os = create_overlap_source(lib, arg);
-    std::unique_ptr<OverlapSource> os(create_overlap_source(lib, arg));
+    std::unique_ptr<OverlapSource>
+        os(create_overlap_source(lib, arg));
     std::cout << "using library: " << lib << std::endl;
 
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> *sequences = os->get_sequences();
@@ -157,7 +160,7 @@ int main(int argc, char *argv[])
     printPaf(overlaps, sequences, out_file);
 
     std::vector<std::unordered_set<std::uint32_t>> annotations((*sequences).size());
-    std::vector<std::vector<snp_position>> snp_positions(50);
+    // std::vector<std::vector<snp_position>> snp_positions(50);
 
     std::vector<std::vector<informative_position>> informative_positions((*overlaps).size());
 
@@ -257,55 +260,55 @@ int main(int argc, char *argv[])
                     rhs.ReverseAndComplement();
                 std::string rhs_tmp = rhs.InflateData();
 
-                // std::string edlib_alignment = cigar_to_edlib_alignment(ovlp.alignment);
+                std::string edlib_alignment = cigar_to_edlib_alignment(ovlp.alignment);
 
-                // for (auto &edlib_align : edlib_alignment)
-                // {
-                //     switch (edlib_align)
-                //     {
-                //     case 0:
-                //     case 3:
-                //     {
-                //         switch (rhs_tmp[rhs_pos])
-                //         {
-                //         case 'A':
-                //             ++base_pile_tmp[lhs_pos].a;
-                //             break;
-                //         case 'C':
-                //             ++base_pile_tmp[lhs_pos].c;
-                //             break;
-                //         case 'G':
-                //             ++base_pile_tmp[lhs_pos].g;
-                //             break;
-                //         case 'T':
-                //             ++base_pile_tmp[lhs_pos].t;
-                //             break;
-                //         default:
-                //             break; // if they align
-                //         }
-                //         ++lhs_pos;
-                //         ++rhs_pos;
-                //         break;
-                //     }
-                //     case 1:
-                //     {
-                //         ++base_pile_tmp[lhs_pos].i;
-                //         ++lhs_pos;
-                //         break; // insertion on the left hand side
-                //     }
-                //     case 2:
-                //     {
-                //         if (lhs_pos < base_pile_tmp.size())
-                //         {
-                //             ++base_pile_tmp[lhs_pos].d;
-                //         }
-                //         ++rhs_pos;
-                //         break; // deletion on the left hand side
-                //     }
-                //     default:
-                //         break;
-                //     }
-                // }
+                for (auto &edlib_align : edlib_alignment)
+                {
+                    switch (edlib_align)
+                    {
+                    case 0:
+                    case 3:
+                    {
+                        switch (rhs_tmp[rhs_pos])
+                        {
+                        case 'A':
+                            ++base_pile_tmp[lhs_pos].a;
+                            break;
+                        case 'C':
+                            ++base_pile_tmp[lhs_pos].c;
+                            break;
+                        case 'G':
+                            ++base_pile_tmp[lhs_pos].g;
+                            break;
+                        case 'T':
+                            ++base_pile_tmp[lhs_pos].t;
+                            break;
+                        default:
+                            break; // if they align
+                        }
+                        ++lhs_pos;
+                        ++rhs_pos;
+                        break;
+                    }
+                    case 1:
+                    {
+                        ++base_pile_tmp[lhs_pos].i;
+                        ++lhs_pos;
+                        break; // insertion on the left hand side
+                    }
+                    case 2:
+                    {
+                        if (lhs_pos < base_pile_tmp.size())
+                        {
+                            ++base_pile_tmp[lhs_pos].d;
+                        }
+                        ++rhs_pos;
+                        break; // deletion on the left hand side
+                    }
+                    default:
+                        break;
+                    }
+                }
             }
         }
 
@@ -404,10 +407,10 @@ int main(int argc, char *argv[])
                 static_cast<double>(jt.t),
                 static_cast<double>(jt.d),
                 static_cast<double>(jt.i)};
-            if (i < 50)
-            {
-                snp_positions[i].push_back({i, j, jt});
-            }
+            // if (i < 50)
+            // {
+            //     snp_positions[i].push_back({i, j, jt});
+            // }
 
             double sum = std::accumulate(counts.begin(), counts.end(), 0);
 
@@ -473,7 +476,8 @@ int main(int argc, char *argv[])
     std::cout << annotations.size() << std::endl;
 
     std::ofstream outdata;
-    outdata.open("snp_annotations.anno");
+    std::string snpOut = sample + "_" + lib + "snp_annotations.anno";
+    outdata.open(snpOut);
 
     for (std::uint32_t i = 0; i < annotations.size(); ++i)
     {

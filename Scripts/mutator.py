@@ -10,9 +10,7 @@ def read_reference_genome(file_path):
     with open(file_path, 'r') as file:
         for line in file:
             if line.startswith('>'):
-                parts = line.split(" ")
-                parts[0] = parts[0] + "_mutated"
-                name = " ".join(parts)
+                name = line[:-1] + "_mutated" + "\n"    
             else:
                 genome += line
 
@@ -43,32 +41,40 @@ def main():
         ref_len_d = len(args.reference_genome_file.split("."))
         suff = args.reference_genome_file.split(".")[ref_len_d - 1]
         name = args.reference_genome_file.split(".")[ref_len_d - 2]
-
         output_file = name + "_mutated." + suff
     result = read_reference_genome(args.reference_genome_file)
-    name = result[0]
+    name = result[0] 
     genome = result[1]
 
-    positions = []
+    positions = {}
 
     mutations = round(len(genome) * float(rate_of_mutation))
     print("Reference genome has", len(genome), "nucleotides")
     print("Mutating", mutations, "positions")
     while mutations > 0:
         position = random.randint(0, len(genome) - 1)
-        positions.append(position)
-        genome = genome[:position] + random.choice('ACGT') + genome[position + 1:]
-        mutations -= 1
-
+        if position not in positions:
+            positions[position] = genome[position]
+            while positions[position] == genome[position]:
+                positions[position] = random.choice(['A', 'T', 'C', 'G'])
+            mutations -= 1
+    print("Mutations have been generated")
+    new_genome = ""
+    for i in range(len (genome)):
+        if i in positions:
+            new_genome += positions[i]
+        else:
+            new_genome += genome[i]
+    print("Mutated genome has been generated")
     with open(output_file, 'w') as file:
         file.write(name)
-        file.write(genome)
+        file.write(new_genome)
         print("Mutated genome has been written to", output_file)
 
-    sorted(positions)
-
+    positions_list = list(positions.keys())
+    positions_list = sorted(positions_list)
     with open("mutations.txt", 'w') as file:
-        for position in positions:
+        for position in positions_list:
             file.write(str(position) + "\n")
         print("Mutations have been written to mutations.txt")
 

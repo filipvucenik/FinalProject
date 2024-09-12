@@ -19,16 +19,16 @@ echo "converted to sam ${sam_output}"
 
 # Step 4: run samtools to convert sam to bam
 bam_output="${output_name}_mp2.bam"
-samtools view -bho $bam_output $sam_output
+samtools view -bho $bam_output -@64  $sam_output
 echo "converted to bam ${bam_output}"
 
 # Step 5: run samtools to sort the bam file
 sorted_bam_output="${output_name}_mp2_sorted.bam"
-samtools sort -o $sorted_bam_output $bam_output
+samtools sort -o $sorted_bam_output -@64  $bam_output
 echo "sorted bam file ${sorted_bam_output}"
 
 # Step 6: run samtools to index the bam file
-samtools index $sorted_bam_output
+samtools index -@64 $sorted_bam_output
 echo "indexed bam file ${sorted_bam_output}"
 
 # Step 7: index the reads
@@ -59,5 +59,4 @@ mv $sam_output visualization/SAM_files
 mv $bam_output visualization/BAM_files
 mv $sorted_bam_output visualization/BAM_files
 mv ${sorted_bam_output}.bai visualization/BAM_files
-mv ${reads}.fai visualization/indexed_reads
 echo "done"

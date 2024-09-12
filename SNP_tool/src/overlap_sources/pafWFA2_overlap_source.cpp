@@ -165,7 +165,7 @@ private:
                                 const std::string &lhs,
                                 const std::string &rhs) -> std::string
         {
-            wfa::WFAlignerGapAffine aligner(4, 6, 2, wfa::WFAligner::Alignment, wfa::WFAligner::MemoryHigh);
+            wfa::WFAlignerGapAffine aligner(-3, 5, 4, 4, wfa::WFAligner::Alignment, wfa::WFAligner::MemoryHigh);
             aligner.alignEnd2End(lhs.c_str(), lhs.size(), rhs.c_str(), rhs.size());
             std::string alignment = aligner.getAlignment();
 
@@ -313,12 +313,19 @@ private:
             futures.emplace_back(threads->Submit([&](std::size_t i) -> void
                                                  {
                     for(std::size_t j = 0; j < overlaps[i].size(); j++){
+
                         auto lhs = sequences[i]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin);
                         biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].rhs_begin, overlaps[i][j].rhs_end - overlaps[i][j].rhs_begin));
                         if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
                         auto rhs = rhs_.InflateData();
 
                         overlaps[i][j].alignment = wfa2_wrapper(i, overlaps[i][j], lhs, rhs);
+
+                        if(overlaps[i][j].lhs_id == 2 && overlaps[i][j].rhs_id == 77){
+                            std::cout << "lhs: " << sequences[i]->name << std::endl << lhs << std::endl;
+                            std::cout << "rhs: " << sequences[overlaps[i][j].rhs_id]->name << std::endl <<rhs<< std::endl;
+                            std::cout << "alignment: " << overlaps[i][j].alignment << std::endl;
+                        }
 
                     } }, i));
 

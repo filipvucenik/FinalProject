@@ -75,6 +75,7 @@
         "execution": "cpp",
         "locale": "cpp",
         "stdio.h": "c",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "cinttypes": "cpp"
     }
 }

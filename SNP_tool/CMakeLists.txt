@@ -18,6 +18,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 include(FetchContent)
 include(GNUInstallDirs)
 
+
 ## Find bioparser package
 find_package(bioparser 3.0.13 QUIET)
 if (NOT bioparser_FOUND)
