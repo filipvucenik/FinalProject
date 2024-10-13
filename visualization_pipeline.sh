@@ -54,9 +54,13 @@ fi
 echo "created output directories"
 
 # Step 9: move the files to the output directory
-mv $minimap_output visualization/minimap2Paf
-mv $sam_output visualization/SAM_files
-mv $bam_output visualization/BAM_files
+#mv $minimap_output visualization/minimap2Paf
+rm $minimap_output
+#mv $sam_output visualization/SAM_files
+rm $sam_output
+#mv $bam_output visualization/BAM_files
+rm $bam_output
 mv $sorted_bam_output visualization/BAM_files
 mv ${sorted_bam_output}.bai visualization/BAM_files
 echo "done"
+

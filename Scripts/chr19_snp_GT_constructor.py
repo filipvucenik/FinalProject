@@ -1,5 +1,7 @@
 import sys
 
+badread = True
+
 def binary_search_closest(arr, target):
     left = 0
     right = len(arr) - 1
@@ -28,42 +30,65 @@ def main():
             off = 1
     
     snp_out = "chr19_p_snp_GT.anno"
+    if badread:
+        snp_out = "badread_50X_GT.anno"
     with open(GT_PATERNAL, "r") as f:
         parental_gt = list(map(int,f.readlines()[1:]))
     with open(GT_MATERNAL, "r") as f:
         maternal_gt = list(map(int,f.readlines()[1:]))
     with open(reads_file, "r") as f:
         with open(snp_out, "w") as out:
-            for line in f:
-                if line[0] != ">":
+            lines = f.readlines()
+            for i in range(0, len(lines), 2):
+                if lines[i] == "\n":
                     continue
-                split = line[1:].split("_")
-                rn = int(split[0].split("=")[1]) - 1 # 0-based 
-                pos = split[2].split("=")[1].split("-")
-                start = int(pos[0])
-                end = int(pos[1])
                 
-                reversed = split[1] == "reverse"
-                            
-                if split[4].endswith("PATERNAL"):
-                    gt = parental_gt
+                if badread:
+                    split = lines[i][1:-1].split("|")
+                    pos = split[2].split(";")[0].split("-")
+                    start =int(pos[0])
+                    end = int(pos[1])
+                    
+                    reversed = split[1] == "-strand"
+                    
+                    if split[0].endswith("PATERNAL"):
+                        gt = parental_gt
+                    else:
+                        gt = maternal_gt
+                    
                 else:
-                    gt = maternal_gt
+                    split = lines[i][1:].split("_")
+                    pos = split[2].split("=")[1].split("-")
+                    start = int(pos[0])
+                    end = int(pos[1])
+                    
+                    reversed = split[1] == "reverse"
+                                
+                    if split[4].endswith("PATERNAL"):
+                        gt = parental_gt
+                    else:
+                        gt = maternal_gt
                 start_idx, _ = binary_search_closest(gt, start)
                 _, end_idx = binary_search_closest(gt, end)
+                if start_idx > end_idx:
+                    continue
                 gt_segment = gt[start_idx:end_idx]
                
                 if len(gt_segment) == 0:
                     continue
                 
                 if reversed:
-                    reduced_segment = [end - x - 1 + off for x in gt_segment]
-                    reduced_segment.reverse()
+                    reduced_segment = [(end - x - 1 + off) for x in gt_segment]
                 else:
-                    reduced_segment = [x - start - off for x in gt_segment]
-                    
-
-                out.write(f"{rn} {' '.join(map(str, reduced_segment))}\n")
+                    reduced_segment = [(x - start - off) for x in gt_segment]
+                out.write(f"{lines[i][1:-1]}")
+                for x in reduced_segment:
+                    if x < len(lines[i+1]) and x >= 0:
+                        if lines[i+1][x] != "\n":
+                            out.write(f" {x}:{lines[i+1][x]}")
+                    else:
+                        out.write(f" {x}:N")
+                out.write(f"\n")
             
 
         

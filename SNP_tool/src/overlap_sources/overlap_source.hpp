@@ -5,13 +5,13 @@
 #include <string>
 #include <memory>
 
-#include "../../out/build/Preset/_deps/biosoup-src/include/biosoup/overlap.hpp"
-#include "../../out/build/Preset/_deps/biosoup-src/include/biosoup/nucleic_acid.hpp"
+#include "overlap.hpp"
+#include "nucleic_acid.hpp"
 
 class OverlapSource
 {
 public:
-    virtual std::vector<std::vector<biosoup::Overlap>> *get_overlaps() = 0;
+    virtual std::unique_ptr<std::vector<std::vector<biosoup::Overlap>>> get_overlaps() = 0;
     virtual std::vector<std::unique_ptr<biosoup::NucleicAcid>> *get_sequences() = 0;
     virtual ~OverlapSource() = default;
 };

@@ -123,7 +123,7 @@ private:
                                         id_r,
                                         std::stoi(variables[7]),
                                         std::stoi(variables[8]),
-                                        255,
+                                        std::stoi(variables[9]),
                                         tmp,
                                         variables[4] == "+");
         }
@@ -133,7 +133,7 @@ private:
                                  std::uint32_t i,
                                  const biosoup::Overlap &it,
                                  const std::string &lhs,
-                                 const std::string &rhs) -> std::string
+                                 const std::string &rhs) -> std::pair<std::string, int>
         {
             std::string cigar_alignment = "";
             EdlibAlignResult result = edlibAlign(
@@ -144,16 +144,17 @@ private:
             {
                 cigar_alignment = edlibAlignmentToCigar(result.alignment, result.alignmentLength, EDLIB_CIGAR_EXTENDED);
                 edlibFreeAlignResult(result);
-                return cigar_alignment;
+                int score = result.editDistance;
+                return std::make_pair(cigar_alignment, score);
             }
             else
             {
                 edlibFreeAlignResult(result);
                 std::string cigar_alignment = "";
-                return cigar_alignment;
+                return std::make_pair(cigar_alignment, 0);
             }
         };
-        auto threads = std::make_shared<thread_pool::ThreadPool>(64);
+        auto threads = std::make_shared<thread_pool::ThreadPool>(100);
         std::vector<std::future<void>> futures;
         for (std::size_t i = 0; i < overlaps.size(); i++)
         {
@@ -170,7 +171,9 @@ private:
                             std::cout << rhs << std::endl;
                         }
                          */
-                        overlaps[i][j].alignment = edlib_wrapper(i, overlaps[i][j], lhs, rhs);
+                        auto res = edlib_wrapper(i, overlaps[i][j], lhs, rhs);
+                        overlaps[i][j].alignment = res.first;
+                        overlaps[i][j].score = res.second;  
                         /*
                         if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated"){
                             std::cout<<overlaps[i][j].alignment<<std::endl;
@@ -188,7 +191,7 @@ private:
     }
 
 public:
-    std::vector<std::vector<biosoup::Overlap>> *get_overlaps() override
+    std::unique_ptr<std::vector<std::vector<biosoup::Overlap>>> get_overlaps() override
     {
         if (overlaps.empty())
         {
@@ -196,7 +199,7 @@ public:
             load_paf();
         }
 
-        return &overlaps;
+        return std::make_unique<std::vector<std::vector<biosoup::Overlap>>>(std::move(overlaps));
     }
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> *get_sequences() override
     {

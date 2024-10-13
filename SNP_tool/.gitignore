@@ -1,5 +1,6 @@
 cmake-build-debug
 .idea
+.vscode
 samples
 hifiasm_overlaps.paf
 hifiasm_overlapsPA_15c.paf
@@ -18,3 +19,6 @@ PA
 newBuild
 reads
 hifiasmOverlaps
+debugBuild
+indelBuild
+debugOverlaps

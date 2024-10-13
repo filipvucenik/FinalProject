@@ -2,6 +2,8 @@
 #include "bioparser/fasta_parser.hpp"
 #include "biosoup/nucleic_acid.hpp"
 #include "biosoup/overlap.hpp"
+#include "thread_pool/thread_pool.hpp"
+#include "astarpa.h"
 
 #include <iostream>
 #include <string>
@@ -20,7 +22,7 @@ private:
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> sequences;
     std::string reads;
     std::string paf_file;
-    std::unordered_map<std::string, size_t> sequence_id;
+    std::unordered_map<std::string, std::size_t> sequence_id;
 
     std::unique_ptr<bioparser::Parser<biosoup::NucleicAcid>> create_parser(std::string &path)
     {
@@ -74,7 +76,7 @@ private:
         }
     }
 
-    size_t find_id(std::string overlap_name)
+    std::size_t find_id(std::string overlap_name)
     {
         for (auto &it : sequences)
         {
@@ -89,11 +91,10 @@ private:
     void load_paf()
     {
         std::string line;
-        if (!std::filesystem::exists(paf_file))
-        {
-            std::cerr << "File does not exist: " << paf_file << std::endl;
-        }
         std::ifstream fileStream(paf_file);
+        std::cout << "Loading paf file" << std::endl;
+        std::string tmp;
+
         if (!fileStream.is_open())
         {
             std::cerr << "Error opening file" << std::endl;
@@ -102,7 +103,7 @@ private:
             std::cout << "File path: " << paf_file << std::endl;
             exit(1);
         }
-        std::string tmp;
+
         while (std::getline(fileStream, line))
         {
             std::istringstream iss(line);
@@ -112,29 +113,83 @@ private:
             {
                 variables.push_back(v);
             }
-            size_t id_l = sequence_id[variables[0]];
-            size_t id_r = sequence_id[variables[5]];
 
-            if (variables.size() >= 11)
-            {
-                tmp = variables[10];
-            }
-            else
-            {
-                tmp = "";
-            }
+            std::size_t id_l = sequence_id[variables[0]];
+            std::size_t id_r = sequence_id[variables[5]];
+
             overlaps[id_l].emplace_back(id_l,
                                         std::stoi(variables[2]),
                                         std::stoi(variables[3]),
                                         id_r,
                                         std::stoi(variables[7]),
                                         std::stoi(variables[8]),
-                                        std::stol(variables[9]),
-                                        tmp.c_str(),
-                                        tmp.size(),
+                                        255,
+                                        tmp,
                                         variables[4] == "+");
         }
+
         std::cout << "Loaded paf file" << std::endl;
+        auto astarPA_wrapper = [&](
+                                   std::uint32_t i,
+                                   const biosoup::Overlap &it,
+                                   const std::string &lhs,
+                                   const std::string &rhs) -> std::string
+        {
+            size_t len;
+            uint8_t *cigar;
+            astarpa((const uint8_t *)lhs.c_str(), lhs.size(), (const uint8_t *)rhs.c_str(), rhs.size(),
+                    &cigar, &len);
+            std::string cigar_string = (const char *)cigar;
+            astarpa_free_cigar(cigar);
+
+            std::string return_cigar = "";
+
+            for (size_t i = 0; i < cigar_string.size() - 1; i++)
+            {
+                if (std::isalpha(cigar_string[i]) && std::isalpha(cigar_string[i + 1]))
+                {
+                    return_cigar += cigar_string[i] + '1';
+                }
+                else
+                {
+                    return_cigar += cigar_string[i];
+                }
+            }
+            return_cigar += cigar_string[cigar_string.size() - 1];
+            return return_cigar;
+        };
+        auto threads = std::make_shared<thread_pool::ThreadPool>(64);
+        std::vector<std::future<void>> futures;
+        for (std::size_t i = 0; i < overlaps.size(); i++)
+        {
+            futures.emplace_back(threads->Submit([&](std::size_t i) -> void
+                                                 {
+                    for(std::size_t j = 0; j < overlaps[i].size(); j++){
+                        auto lhs = sequences[i]->InflateData(overlaps[i][j].lhs_begin, overlaps[i][j].lhs_end - overlaps[i][j].lhs_begin);
+                        biosoup::NucleicAcid rhs_ ("", sequences[overlaps[i][j].rhs_id]->InflateData(overlaps[i][j].rhs_begin, overlaps[i][j].rhs_end - overlaps[i][j].rhs_begin));
+                        if(!overlaps[i][j].strand) rhs_.ReverseAndComplement();
+                        auto rhs = rhs_.InflateData();
+                        /*
+                        if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated") {
+                            std::cout << lhs << std::endl;
+                            std::cout << rhs << std::endl;
+                        }
+                         */
+                        overlaps[i][j].alignment = astarPA_wrapper(i, overlaps[i][j], lhs, rhs);
+                        /*
+                        if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated"){
+                            std::cout<<overlaps[i][j].alignment<<std::endl;
+                            std::cout<<"-----------------------------------------"<<std::endl;
+                        }
+                         */
+                    } }, i));
+        }
+
+        for (auto &future : futures)
+        {
+            future.wait();
+        }
+        std::cout << "pairwise alignment done" << std::endl;
     }
 
 public:
@@ -169,3 +224,12 @@ extern "C" OverlapSource *__attribute__((visibility("default"))) create(std::str
 {
     return (OverlapSource *)new PafOverlapSource(args);
 }
+
+// int main()
+// {
+//     std::string args = "../samples/E-coli_reads_15c.fasta ../hifiasm_overlaps_15c.paf";
+//     std::unique_ptr<OverlapSource> source(create(args));
+//     auto overlaps = source->get_overlaps();
+//     auto sequences = source->get_sequences();
+//     std::cout << "done" << std::endl;
+// }

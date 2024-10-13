@@ -89,7 +89,7 @@ def main():
                 read2_len = split[6]
                 read2_start = split[7]
                 read2_end = split[8]
-                cigar  = split[11]
+                cigar  = split[10]
                 minimap_cigar, total_matches, total_alignment_length = convertCigarToMinimap(cigar)
                 
                 if strand == "-":

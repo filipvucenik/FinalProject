@@ -14,16 +14,16 @@ def main():
     with open(snp_annotations, "r") as f:
         for line in f:
             split = line.split(" ")
-            anno[int(split[0])] = set([int(x) for x in split[1:]])
-            reads.add(int(split[0]))
+            anno[split[0]] = set([int(x.split(":")[0]) for x in split[1:-1]])
+            reads.add(split[0])
     print("Loaded annotations")
     gt = {}
     
     with open(ground_truth, "r") as f:
         for line in f:
             split = line.split(" ")
-            gt[int(split[0])] = set([int(x) for x in split[1:]])
-            reads.add(int(split[0]))
+            gt[split[0]] = set([int(x.split(":")[0]) for x in split[1:]])
+            reads.add(split[0])
             
     print("Loaded ground truth")
     tp = 0

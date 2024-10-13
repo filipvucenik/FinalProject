@@ -76,6 +76,7 @@
         "locale": "cpp",
         "stdio.h": "c",
         "ranges": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "hash_map": "cpp"
     }
 }

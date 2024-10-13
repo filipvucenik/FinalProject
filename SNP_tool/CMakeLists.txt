@@ -91,22 +91,22 @@ if (NOT thread_pool_FOUND)
 endif ()
 
 ### Adding ram
-find_package(ram 1.0.0 QUIET)
-if (NOT ram_FOUND)
-    FetchContent_Declare(
-            ram
-            GIT_REPOSITORY https://github.com/kocijan/ram
-            GIT_TAG kocijan/hpc)
+# find_package(ram 1.0.0 QUIET)
+# if (NOT ram_FOUND)
+#     FetchContent_Declare(
+#             ram
+#             GIT_REPOSITORY https://github.com/kocijan/ram
+#             GIT_TAG kocijan/hpc)
 
-    FetchContent_GetProperties(ram)
-    if (NOT ram_POPULATED)
-        FetchContent_Populate(ram)
-        add_subdirectory(
-                ${ram_SOURCE_DIR}
-                ${ram_BINARY_DIR}
-                EXCLUDE_FROM_ALL)
-    endif ()
-endif ()
+#     FetchContent_GetProperties(ram)
+#     if (NOT ram_POPULATED)
+#         FetchContent_Populate(ram)
+#         add_subdirectory(
+#                 ${ram_SOURCE_DIR}
+#                 ${ram_BINARY_DIR}
+#                 EXCLUDE_FROM_ALL)
+#     endif ()
+# endif ()
 
 # adding edlib
 find_package(edlib 1.2.7 QUIET)
@@ -144,12 +144,14 @@ if (NOT wfa2_FOUND)
     endif ()
 endif ()
 
-set_target_properties(ram PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# set_target_properties(ram PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # include_directories(${bioparser_INCLUDE_DIRS}  ${biosoup_INCLUDE_DIRS})
 
 add_executable(snp
         src/snp_main.cpp)
+
+add_executable(test src/test.cpp)
 
 
 # add_library(overlap_source INTERFACE)
@@ -161,6 +163,19 @@ add_library(pafEDL_overlap_source SHARED src/overlap_sources/pafEDL_overlap_sour
 add_library(pafKSW2_overlap_source SHARED src/overlap_sources/pafKSW2_overlap_source.cpp)
 # add_library(ksw2 STATIC src/overlap_sources/ksw2_gg2_sse.c)
 add_library(pafWFA2_overlap_source SHARED src/overlap_sources/pafWFA2_overlap_source.cpp)
+add_library(pafPA_overlap_source SHARED src/overlap_sources/pafPA_overlap_source.cpp)
+
+link_directories($ENV{LD_LIBRARY_PATH})
+message(STATUS "LD_LIBRARY_PATH: $ENV{LD_LIBRARY_PATH}")
+
+link_directories(/home/stufilip/scratch/FinalProject/astar-pairwise-aligner/target/release)
+
+add_library(pafASPA_overlap_source SHARED src/overlap_sources/pafASPA_overlap_source.cpp)
+set_target_properties(pafASPA_overlap_source PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        CXX_COMPILER /usr/bin/clang++
+ )
+
 
 # target_include_directories(ram_overlap_source PUBLIC
 #         ${PROJECT_SOURCE_DIR}/include
@@ -230,16 +245,22 @@ target_link_libraries(pafKSW2_overlap_source
         thread_pool::thread_pool
 )
 
+target_link_libraries(pafASPA_overlap_source
+        bioparser::bioparser
+        biosoup::biosoup
+        thread_pool::thread_pool
+        astarpa_c
+)
 
 
-# target_include_directories( pafPA_overlap_source PUBLIC
-#         ${PROJECT_SOURCE_DIR}/include
-#         ${biosoup_INCLUDE_DIRS}
-# )
-# target_link_libraries(pafPA_overlap_source
-#         biosoup::biosoup
-#         bioparser::bioparser
-# )
+target_include_directories( pafPA_overlap_source PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${biosoup_INCLUDE_DIRS}
+)
+target_link_libraries(pafPA_overlap_source
+        biosoup::biosoup
+        bioparser::bioparser
+)
 
 # target_include_directories( pafM2_overlap_source PUBLIC
 #         ${PROJECT_SOURCE_DIR}/include
@@ -256,7 +277,7 @@ target_include_directories(snp PUBLIC
         ${bioparser_INCLUDE_DIRS}
         ${biosoup_INCLUDE_DIRS}
         ${thread_pool_INCLUDE_DIRS}
-        ${ram_INCLUDE_DIRS}
+        # ${ram_INCLUDE_DIRS}
         ${edlib_INCLUDE_DIRS}
 )
 
@@ -264,8 +285,15 @@ target_link_libraries(snp
         bioparser::bioparser
         biosoup::biosoup
         thread_pool::thread_pool
-        ram::ram
+        # ram::ram
         edlib::edlib
         overlap_source_factory
         ${CMAKE_DL_LIBS}
         )
+
+target_link_libraries(test
+wfa2::wfa2
+edlib::edlib)
+target_sources(test PRIVATE
+    ${wfa2_SOURCE_DIR}/bindings/cpp/WFAligner.cpp  # Example source file
+)

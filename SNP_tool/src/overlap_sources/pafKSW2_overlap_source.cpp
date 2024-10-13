@@ -476,12 +476,12 @@ private:
                                 std::uint32_t i,
                                 const biosoup::Overlap &it,
                                 const std::string &lhs,
-                                const std::string &rhs) -> std::string
+                                const std::string &rhs) -> std::pair<std::string, int>
         {
             std::int8_t m = 3;
             std::int8_t n = -5;
-            std::int8_t g = 4;
-            std::int8_t e = 4;
+            std::int8_t g = 6;
+            std::int8_t e = 2;
             std::int8_t mn[25] = {
                 m, n, n, n, 0,
                 n, m, n, n, 0,
@@ -507,7 +507,7 @@ private:
             int m_cigar = 0, n_cigar = 0;
             std::uint32_t *cigar = nullptr;
 
-            auto score = ksw_gg2_sse(
+            ksw_gg2_sse(
                 nullptr,    // void *km
                 lhs.size(), // int qlen
                 lhs_,       // const uint8_t *query
@@ -521,6 +521,7 @@ private:
                 &m_cigar,   // int *m_cigar_
                 &n_cigar,   // int *n_cigar_
                 &cigar);    // uint32_t **cigar_
+            size_t edit_distance = 0;
             std::string cigar_string = "";
             if (n_cigar > 0)
             {
@@ -548,6 +549,7 @@ private:
                             else if (lhs[lhs_i + k] == rhs[rhs_i + k] && !match)
                             {
                                 cigar_string += std::to_string(inarw_count) + "X";
+                                edit_distance += inarw_count;
                                 inarw_count = 0;
                                 match = true;
                             }
@@ -556,7 +558,10 @@ private:
                         if (match)
                             cigar_string += std::to_string(inarw_count) + "=";
                         else
+                        {
                             cigar_string += std::to_string(inarw_count) + "X";
+                            edit_distance += inarw_count;
+                        }
                         lhs_i += count;
                         rhs_i += count;
                         break;
@@ -564,12 +569,14 @@ private:
                     case 1:
                     { // I
                         cigar_string += std::to_string(count) + "I";
+                        edit_distance += count;
                         lhs_i += count;
                         break;
                     }
                     case 2:
                     { // D
                         cigar_string += std::to_string(count) + "D";
+                        edit_distance += count;
                         rhs_i += count;
                         break;
                     }
@@ -582,7 +589,7 @@ private:
             delete[] rhs_;
             delete[] lhs_;
 
-            return cigar_string;
+            return std::make_pair(cigar_string, edit_distance);
         };
 
         auto threads = std::make_shared<thread_pool::ThreadPool>(100);
@@ -603,7 +610,9 @@ private:
                         std::cout << rhs << std::endl;
                     }
                      */
-                    overlaps[i][j].alignment = ksw2_wrapper(i, overlaps[i][j], lhs, rhs);
+                    auto res = ksw2_wrapper(i, overlaps[i][j], lhs, rhs);
+                    overlaps[i][j].alignment = res.first;
+                    overlaps[i][j].score = res.second;
                     /*
                     if(sequences[i]->name == "read=1,reverse,position=2675766-2676093,length=327,NC_000913.3_mutated"){
                         std::cout<<overlaps[i][j].alignment<<std::endl;
@@ -621,7 +630,7 @@ private:
     }
 
 public:
-    std::vector<std::vector<biosoup::Overlap>> *get_overlaps() override
+    std::unique_ptr<std::vector<std::vector<biosoup::Overlap>>> get_overlaps() override
     {
         if (overlaps.empty())
         {
@@ -629,7 +638,7 @@ public:
             load_paf();
         }
 
-        return &overlaps;
+        return std::make_unique<std::vector<std::vector<biosoup::Overlap>>>(std::move(overlaps));
     }
     std::vector<std::unique_ptr<biosoup::NucleicAcid>> *get_sequences() override
     {
